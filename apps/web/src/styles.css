@@ -1,0 +1,115 @@
+:root {
+  color: #1f2937;
+  background: #f4f6f8;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.page-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-shell {
+  background: #eef2f5;
+}
+
+.login-card {
+  width: min(100%, 420px);
+  border: 1px solid #e5e7eb;
+}
+
+.brand-mark {
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+h1 {
+  margin: 12px 0 8px;
+  font-size: 28px;
+}
+
+.muted {
+  margin: 0 0 24px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.workspace-shell {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 32px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.workspace-content {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 32px 0;
+}
+
+.breadcrumb {
+  margin-bottom: 28px;
+}
+
+.workspace-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 0 20px;
+  }
+
+  .workspace-content {
+    width: min(100% - 32px, 1180px);
+    padding-top: 24px;
+  }
+
+  .workspace-heading {
+    display: block;
+  }
+
+  .workspace-heading .el-button {
+    margin-top: 16px;
+  }
+}

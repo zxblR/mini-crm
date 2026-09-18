@@ -12,12 +12,12 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 
 | 层次 | 固定技术 |
 | --- | --- |
-| 运行时与包管理 | Node.js 22 LTS、pnpm 10、TypeScript 5.7+ |
-| Web 前端 | Vue 3.5、Vite 6、Pinia 2.3、Element Plus 2.9、ECharts 5.6、Vue Router 4 |
-| API 后端 | NestJS 11、TypeScript、class-validator、Swagger/OpenAPI |
-| 数据访问 | Prisma 6；禁止在业务代码中直接拼接 SQL；复杂查询使用 Prisma `$queryRaw` 参数化调用 |
-| 主数据库 | PostgreSQL 16 |
-| 缓存与异步 | Redis 7.4、BullMQ 5 |
+| 运行时与包管理 | Node.js 22.20.0 LTS、pnpm 11.19.0、TypeScript 5.7.2 |
+| Web 前端 | Vue 3.5.13、Vite 6.2.5、Pinia 2.3.1、Element Plus 2.9.6、ECharts 5.6.0、Vue Router 4.5.0、Axios 1.8.4 |
+| API 后端 | NestJS 11.0.11、TypeScript 5.7.2、class-validator（待接入）、Swagger/OpenAPI（待接入） |
+| 数据访问 | Prisma 6.5.0；禁止在业务代码中直接拼接 SQL；复杂查询使用 Prisma `$queryRaw` 参数化调用 |
+| 主数据库 | PostgreSQL 16-alpine（Docker 镜像） |
+| 缓存与异步 | Redis 7.4-alpine（Docker 镜像）、BullMQ 5.41.5、ioredis 5.4.1 |
 | 认证授权 | JWT（短期 access token + 可撤销 refresh token）、RBAC、bcrypt/argon2 密码哈希 |
 | 部署 | Docker Compose v2；本地、CI、生产镜像均从 Dockerfile 构建 |
 | 测试与质量 | Vitest、Vue Test Utils、Jest/Supertest（API）、Playwright（关键 E2E）、ESLint、Prettier |
@@ -74,7 +74,7 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 
 ## 5. Git 规范
 
-- 分支：`main` 为可发布分支；功能使用 `feat/<topic>`，修复使用 `fix/<topic>`，文档使用 `docs/<topic>`，重构使用 `refactor/<topic>`。
+- 分支固定为 `main` 和 `feature`：`main` 为可发布主分支，`feature` 为唯一开发分支；功能、修复、文档和重构均提交到 `feature`，通过 Pull Request 从 `feature` 合并到 `main`。未经 ADR 批准不得创建其他长期分支，也不得直接向 `main` 提交或推送。
 - Commit 使用 Conventional Commits：`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`；标题祈使句、英文、不超过 72 个字符。
 - 一个提交只解决一个可回滚主题；不要提交构建产物、coverage、`.env`、数据库 dump 或临时文件。
 - Pull Request 必须包含背景、方案、测试命令、数据库迁移说明和截图（涉及 UI 时）。
