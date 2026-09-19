@@ -9,6 +9,7 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
+    "test:e2e": "pnpm --filter @mini-crm/api test:e2e",
     "build": "pnpm -r --if-present build"
   },
   "devDependencies": {
