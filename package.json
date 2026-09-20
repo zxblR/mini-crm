@@ -4,13 +4,18 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "lint": "eslint . --ext .ts,.vue",
+    "lint": "eslint apps/web packages/shared --ext .ts,.vue",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test",
-    "test:e2e": "pnpm --filter @mini-crm/api test:e2e",
-    "build": "pnpm -r --if-present build"
+    "test": "pnpm -r --if-present test && pnpm test:java",
+    "test:java": "mvn -f apps/api/pom.xml test",
+    "test:e2e": "mvn -f apps/api/pom.xml test",
+    "build": "pnpm -r --if-present build && pnpm build:java",
+    "build:java": "mvn -f apps/api/pom.xml package -DskipTests",
+    "prisma:format": "prisma format --schema prisma/schema.prisma",
+    "prisma:validate": "prisma validate --schema prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "8.18.0",
@@ -19,6 +24,7 @@
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-vue": "9.32.0",
     "prettier": "3.4.2",
+    "prisma": "6.5.0",
     "typescript": "5.7.2"
   }
 }

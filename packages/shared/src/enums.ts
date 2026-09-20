@@ -1,7 +1,8 @@
 export enum RoleCode {
-  Admin = 'admin',
-  Sales = 'sales',
-  Viewer = 'viewer',
+  Owner = 'OWNER',
+  Admin = 'ADMIN',
+  Sales = 'SALES',
+  Support = 'SUPPORT',
 }
 
 export enum FollowUpType {
@@ -44,9 +45,10 @@ export enum SortOrder {
 }
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
+  [RoleCode.Owner]: '所有者',
   [RoleCode.Admin]: '管理员',
   [RoleCode.Sales]: '销售',
-  [RoleCode.Viewer]: '只读成员',
+  [RoleCode.Support]: '支持成员',
 };
 
 export const FOLLOW_UP_TYPE_LABELS: Record<FollowUpType, string> = {

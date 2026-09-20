@@ -89,6 +89,7 @@ Mini CRM 为小微销售团队提供从线索进入、分配、资格判断、�
 
 ## 6. 非功能要求
 
+- 运行时目录：Java Spring Boot API 位于 `apps/api`，Python FastAPI 服务位于 `apps/ai`；本地 Java API 使用 `8080` 端口，PostgreSQL 宿主端口统一为 `55432`。
 - API p95 在 100 个并发用户、常规列表分页下小于 500ms（不含异步导入）。
 - 所有密码使用强哈希；JWT secret、数据库和 Redis 凭据不入库、不入日志。
 - 关键写操作可审计；健康检查可区分 API、PostgreSQL、Redis 状态。

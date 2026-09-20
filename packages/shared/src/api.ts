@@ -74,6 +74,9 @@ export const ERROR_CODES = {
   taskCompleted: 'TASK_ALREADY_COMPLETED',
   taskCancelled: 'TASK_ALREADY_CANCELLED',
   internal: 'INTERNAL_ERROR',
+  unauthorized: 'UNAUTHORIZED',
+  userInactive: 'USER_INACTIVE',
+  teamNotFound: 'TEAM_NOT_FOUND',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

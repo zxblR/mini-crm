@@ -1,7 +1,10 @@
 # Mini CRM REST API
 
+业务 API 由 Java 21 + Spring Boot 提供；AI 专用接口由 Python FastAPI 内部服务提供。前端只访问 Java API，不直接访问 AI 服务。
+
 ## 1. 通用约定
 
+- 本地运行地址：Java API 为 `http://localhost:8080`；PostgreSQL 宿主端口为 `55432`。容器间调用使用 Compose 服务名，不依赖宿主端口。
 - Base URL：`/api/v1`；Content-Type：`application/json`；认证：`Authorization: Bearer <accessToken>`。
 - 所有成功响应均返回 JSON：`{ "data": ..., "meta": { "requestId": "..." }, "error": null }`；不使用空响应，删除、退出等操作也返回该结构。
 - 失败响应：`{ "data": null, "meta": { "requestId": "..." }, "error": { "code": "...", "message": "...", "details": {} } }`。
@@ -182,7 +185,15 @@
 
 权限：公开（可由编排系统调用）。`/health` 检查进程，`/ready` 检查 PostgreSQL、Redis 和队列依赖；响应同样使用统一包络。依赖不可用时返回 `503 DEPENDENCY_UNAVAILABLE`。
 
-## 7. 枚举与字段约束
+## 7. AI 内部接口
+
+Java API 通过服务端网络调用 AI 服务，浏览器不得直接调用 `AI_SERVICE_URL`。
+
+### `POST /v1/follow-up-suggestions`
+
+服务：Python AI；当前内部开发接口。请求：`{ "lead_name": "王敏", "context": "已确认下周提供方案" }`。响应：`{ "suggestion": "...", "service": "ai-python" }`。生产环境必须由 Java API 负责用户认证、组织归属校验、超时、重试和敏感信息脱敏。
+
+## 8. 枚举与字段约束
 
 - 角色：`admin|sales|viewer`；`worker` 仅为内部执行身份，不出现在用户 `roleCodes` 中。
 - 跟进类型：`call|wechat|email|meeting|other`。
@@ -191,7 +202,7 @@
 - `sortOrder`：`asc|desc`；`sortBy` 仅允许服务端白名单字段，禁止直接映射为 SQL 片段。
 - 所有 ID 使用 UUID；分页、数组长度、字符串长度、邮箱、手机号、颜色和日期格式必须由共享 DTO 校验。未知字段由全局 ValidationPipe 拒绝。
 
-## 8. 错误码最小集合
+## 9. 错误码最小集合
 
 | HTTP | 错误码 | 使用场景 |
 | --- | --- | --- |

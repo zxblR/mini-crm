@@ -1,5 +1,7 @@
 node_modules
 dist
+target
+archive
 coverage
 .git
 pnpm-lock.yaml

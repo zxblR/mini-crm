@@ -34,3 +34,16 @@ export interface UpdateUserInput {
   roleCodes?: RoleCode[];
   isActive?: boolean;
 }
+
+export interface UpdateProfileInput {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+}
+
+export interface TeamSummary {
+  id: string;
+  name: string;
+  slug: string;
+  timezone: string;
+}

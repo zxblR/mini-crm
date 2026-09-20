@@ -1,39 +1,117 @@
 # Mini CRM
 
-Mini CRM 是面向小微团队的客户线索管理系统。当前仓库处于阶段 0：只提供可构建的前后端骨架、健康检查、共享类型和本地基础设施，不包含业务逻辑。
+Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和待办提醒。本仓库采用前后端分离结构，当前不在目录整理任务中新增业务功能。
 
 ## 技术栈
 
 - Web：Vue 3、TypeScript、Vite、Pinia、Vue Router、Element Plus、ECharts、Axios
-- API：NestJS、TypeScript、Prisma、PostgreSQL、Redis、BullMQ
-- 鉴权基线：JWT + RBAC（后续阶段实现）
-- 部署：Docker Compose
+- API：Java 21、Spring Boot 3、Maven、Spring JDBC、PostgreSQL
+- AI：Python 3.12、FastAPI；仅通过 Java API 进行服务端调用
+- 数据模型：根目录 `prisma/` 仅保存 Prisma schema 和 migration
+- 基础设施：Docker Compose、PostgreSQL 16、Redis 7.4
 
 ## 目录
 
 ```text
-apps/web        Vue 前端，占位登录页和工作台
-apps/api        NestJS API，GET /api/health
-packages/shared 前后端共享类型和常量
-docs            已审核产品、数据模型、API 和路线图文档
+apps/web        Vue 前端
+apps/api        Java Spring Boot 业务 API
+apps/ai         Python FastAPI 内部 AI 服务
+packages/shared 前端 TypeScript 共享类型和常量
+prisma          PostgreSQL schema 和不可变 migration
+infra/docker    API/AI Dockerfile
+docs            产品、ER、API、架构、路线图和实施日志
+scripts         工程预检脚本
+archive         旧 NestJS 迁移参考，不参与运行时
 ```
 
 ## 本地启动
 
-1. 复制环境变量：`Copy-Item .env.example .env`。
-2. 启动基础设施：`docker compose up -d`。
-3. 安装依赖：`pnpm install`。
-4. 启动 API：`pnpm --filter api start:dev`，健康检查地址为 `http://localhost:3000/api/health`。
-5. 启动 Web：`pnpm --filter web dev`，打开 `http://localhost:5173`。
+1. 复制环境变量模板：
 
-## 阶段 0 验收
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+2. 安装前端和根级工具依赖：
+
+   ```powershell
+   pnpm install --frozen-lockfile
+   ```
+
+3. 启动 PostgreSQL 和 Redis。PostgreSQL 宿主端口为 `55432`：
+
+   ```powershell
+   docker compose up -d postgres redis
+   ```
+
+4. 应用根目录 Prisma migration：
+
+   ```powershell
+   pnpm exec prisma migrate deploy --schema prisma/schema.prisma
+   ```
+
+5. 启动 Java API：
+
+   ```powershell
+   mvn -f apps/api/pom.xml spring-boot:run
+   ```
+
+   健康检查：`http://localhost:3000/api/health`；就绪检查：`http://localhost:3000/api/ready`；OpenAPI：`http://localhost:3000/api/docs`。
+
+6. 启动 AI 服务：
+
+   ```powershell
+   cd apps/ai
+   python -m uvicorn main:app --reload --port 8000
+   ```
+
+7. 启动 Web：
+
+   ```powershell
+   pnpm -C apps/web dev
+   ```
+
+   前端默认地址为 `http://localhost:5173`，通过 `VITE_API_BASE_URL` 调用 Java API。
+
+也可以使用 Compose 构建并启动 API、AI、PostgreSQL 和 Redis：
 
 ```powershell
-pnpm install
-pnpm lint
-pnpm --filter api build
-pnpm --filter web build
 docker compose up -d
 ```
 
-阶段日志见 `docs/codex-log.md`。当前阶段不要求真实登录、线索 CRUD、数据库迁移或队列业务行为。
+## 结构整理验收
+
+以下命令必须在仓库根目录通过：
+
+```powershell
+mvn -f apps/api/pom.xml test
+pnpm -C apps/web lint
+pnpm -C apps/web build
+python -m compileall apps/ai
+docker compose config
+```
+
+完整质量检查：
+
+```powershell
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+```
+
+预检脚本：
+
+```bash
+bash scripts/codex-preflight.sh
+```
+
+停止本地服务：
+
+```powershell
+docker compose down
+```
+
+架构调用关系见 [`docs/architecture.md`](docs/architecture.md)，工程约定见 [`AGENTS.md`](AGENTS.md)，实施记录见 [`docs/codex-log.md`](docs/codex-log.md)。
