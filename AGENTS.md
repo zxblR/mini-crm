@@ -1,88 +1,108 @@
 # Mini CRM 工程约定
 
-本文件是 Mini CRM 仓库的强制工程约定。若后续 ADR、接口契约或迁移方案与本文件冲突，必须先更新本文件或记录明确的 ADR，再提交实现。
+本文件是 Mini CRM 仓库的强制工程约定。后续 ADR、接口契约或迁移方案与本文件冲突时，必须先更新本文件或记录明确的 ADR，再提交实现。
 
 ## 1. 项目定位
 
-Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和待办提醒。系统采用前后端分离、单仓库管理，所有接口以 REST/JSON 作为默认协议。
+Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和待办提醒。系统采用前后端分离、单仓库管理，默认协议为 REST/JSON。
 
-## 2. 技术栈（基线版本）
+本仓库当前只保留以下运行时：
 
-版本以初始实现时的锁文件为准；未批准的替换不得进入主分支。
+- 前端：Vue 3 + TypeScript + Vite + Pinia + Element Plus + ECharts + Axios。
+- 业务 API：Java 21 + Spring Boot 3 + Maven + Spring MVC + Bean Validation + Springdoc OpenAPI。
+- AI 服务：Python 3.12 + FastAPI，仅提供内部 AI HTTP 能力。
+- 数据库：PostgreSQL 16，宿主机默认端口 `55432`，容器内端口 `5432`。
+- 数据访问：Java 使用 Spring JDBC/JdbcTemplate；禁止引入 ORM。
+- 数据模型工具：Prisma 只维护根目录 `prisma/` 下的 schema 和 migration，不作为 Java API 运行时依赖。
+- 基础设施：Docker Compose、PostgreSQL、Redis；BullMQ/ioredis 只在实际启用异步能力时使用。
 
-| 层次 | 固定技术 |
-| --- | --- |
-| 运行时与包管理 | Node.js 22.20.0 LTS、pnpm 11.19.0、TypeScript 5.7.2 |
-| Web 前端 | Vue 3.5.13、Vite 6.2.5、Pinia 2.3.1、Element Plus 2.9.6、ECharts 5.6.0、Vue Router 4.5.0、Axios 1.8.4 |
-| API 后端 | NestJS 11.0.11、TypeScript 5.7.2、class-validator（待接入）、Swagger/OpenAPI（待接入） |
-| 数据访问 | Prisma 6.5.0；禁止在业务代码中直接拼接 SQL；复杂查询使用 Prisma `$queryRaw` 参数化调用 |
-| 主数据库 | PostgreSQL 16-alpine（Docker 镜像） |
-| 缓存与异步 | Redis 7.4-alpine（Docker 镜像）、BullMQ 5.41.5、ioredis 5.4.1 |
-| 认证授权 | JWT（短期 access token + 可撤销 refresh token）、RBAC、bcrypt/argon2 密码哈希 |
-| 部署 | Docker Compose v2；本地、CI、生产镜像均从 Dockerfile 构建 |
-| 测试与质量 | Vitest、Vue Test Utils、Jest/Supertest（API）、Playwright（关键 E2E）、ESLint、Prettier |
-| 观测 | Pino 结构化日志；请求 ID、用户 ID、组织 ID 必须可关联 |
-
-禁止引入第二套 UI 组件库、状态管理库、ORM 或队列框架，除非有 ADR 和迁移计划。
-
-## 3. 目录结构
+## 2. 目录职责
 
 ```text
 .
 ├─ apps/
-│  ├─ web/                  # Vue3 + Vite 前端
-│  │  └─ src/{api,assets,components,layouts,router,stores,views,types}
-│  └─ api/                  # NestJS 后端
-│     ├─ src/{auth,common,config,dashboard,leads,users,followups,health,main.ts}
-│     ├─ prisma/{schema.prisma,migrations,seed.ts}
-│     └─ test/{unit,e2e}
+│  ├─ web/                  # Vue 3 前端，仅访问 Java API
+│  ├─ api/                  # Java Spring Boot 业务 API，唯一业务后端入口
+│  └─ ai/                   # Python FastAPI 内部 AI 服务
 ├─ packages/
-│  ├─ contracts/            # API DTO、枚举、错误码等前后端共享类型
-│  └─ eslint-config/        # 共享 lint 配置（可选，使用前需保持单一规则源）
+│  └─ shared/               # 仅供前端 TypeScript 使用的共享类型和常量
+├─ prisma/
+│  ├─ schema.prisma         # PostgreSQL 数据模型声明
+│  └─ migrations/           # 可重复部署、不可篡改的数据库迁移
 ├─ infra/
-│  ├─ docker/               # Dockerfile、启动脚本
-│  └─ compose/              # compose.override.yml 等环境编排
-├─ docs/                    # PRD、ER、API、路线图、ADR
-├─ .env.example
-├─ docker-compose.yml
-├─ package.json
-├─ pnpm-workspace.yaml
-└─ AGENTS.md
+│  └─ docker/               # API/AI Dockerfile 等构建资产
+├─ docs/                    # PRD、ER、API、架构、路线图和实施日志
+├─ scripts/                 # 预检、维护和一次性工程脚本
+├─ archive/                 # 非运行时的历史迁移参考，不加入 workspace
+├─ docker-compose.yml       # 本地服务编排
+└─ package.json             # 根级 pnpm 和 Prisma CLI 脚本
 ```
 
 边界规则：
 
-- `apps/web` 不直接访问数据库或 Redis，只调用 `packages/contracts` 描述的 HTTP API。
-- `apps/api` 的 Controller 只做协议适配和权限声明，业务规则放在 Service，数据库访问集中在 Prisma service/repository。
-- 跨应用共享的 DTO、枚举、错误码只能放在 `packages/contracts`，不可复制粘贴。
-- 迁移文件一旦应用到共享环境不可修改，只能新增迁移。
-- 文档中的接口路径、字段命名、枚举值必须与实现和 OpenAPI 保持一致。
+- `apps/web` 不连接 PostgreSQL、Redis 或 FastAPI，只通过 `VITE_API_BASE_URL` 调用 `apps/api`。
+- `apps/api` 是浏览器可访问的唯一业务 API。Controller 只负责协议适配、DTO 校验和权限声明；Service 负责业务规则；Repository/DAO 负责参数化 SQL 和数据库访问。
+- `apps/api` 不使用 Prisma Client，不读取 `prisma/` 生成的运行时代码，也不在业务代码中拼接 SQL。
+- `apps/ai` 不持有业务数据库连接，不绕过 Java API 的认证、组织隔离和敏感信息脱敏。
+- `packages/shared` 只服务前端 TypeScript；Java DTO、Python Pydantic 模型和共享 TS 类型必须以 `docs/api.md` 为契约来源，不能复制粘贴成互不兼容的协议。
+- `archive/` 仅保存旧技术栈的迁移参考，不参与 Compose、Maven、pnpm workspace 或生产镜像。
+- 已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md` 不因目录整理修改；只有字段或架构发生明确冲突时，先记录 ADR 再修改。
 
-## 4. 编码规范
+## 3. 分层与编码规范
 
-- 文件统一 UTF-8；源码、配置和脚本默认 ASCII，产品中文文案按业务需要使用 UTF-8。
-- 缩进 2 空格，单引号，分号，行尾 LF；由 Prettier 统一格式化。
-- TypeScript 开启 `strict`；禁止 `any`，确需使用必须在同一行说明原因并限制范围。
-- 变量、函数使用 `camelCase`；类型、类、Vue 组件使用 `PascalCase`；常量使用 `UPPER_SNAKE_CASE`；数据库字段使用 `snake_case`，Prisma 模型使用 `PascalCase` 并显式 `@map`。
-- API 返回统一为 `{ data, meta, error }` 形状；分页使用 `page`、`pageSize`、`total`。
-- 时间全部以 UTC 存储和传输，API 使用 ISO 8601；前端按用户时区展示。
-- 所有写接口必须校验 DTO、权限和资源归属；列表接口必须支持分页，并设置最大 `pageSize`。
-- 错误使用稳定的业务错误码，不向客户端返回堆栈、SQL 或密钥；日志记录上下文但脱敏手机号、邮箱、token。
-- Vue 组件优先 `<script setup lang="ts">`；页面状态进入 Pinia，局部交互状态留在组件；重复请求封装在 `apps/web/src/api`。
-- ECharts 配置放在组件或专用 composable 中，图表实例在卸载时销毁；表格、表单、空态、加载态、错误态必须完整。
-- 密码、JWT secret、数据库 URL、Redis URL 只能来自环境变量；不得提交 `.env`、真实 token 或客户数据。
+### Web
 
-## 5. Git 规范
+- 页面放在 `apps/web/src/views`，路由放在 `router`，全局状态放在 Pinia stores，重复请求封装在 `src/api`。
+- 组件优先使用 `<script setup lang="ts">`；TypeScript 开启 `strict`，禁止 `any`。
+- Element Plus 是唯一 UI 组件库；图表使用 ECharts，组件卸载时销毁实例。
+- 列表、表单、空态、加载态、错误态和权限不足状态必须完整。
 
-- 分支固定为 `main` 和 `feature`：`main` 为可发布主分支，`feature` 为唯一开发分支；功能、修复、文档和重构均提交到 `feature`，通过 Pull Request 从 `feature` 合并到 `main`。未经 ADR 批准不得创建其他长期分支，也不得直接向 `main` 提交或推送。
-- Commit 使用 Conventional Commits：`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`；标题祈使句、英文、不超过 72 个字符。
-- 一个提交只解决一个可回滚主题；不要提交构建产物、coverage、`.env`、数据库 dump 或临时文件。
-- Pull Request 必须包含背景、方案、测试命令、数据库迁移说明和截图（涉及 UI 时）。
-- 合并前必须通过 CI；禁止绕过 hooks、强推 `main`、把未审查的自动生成代码直接合并。
+### Java API
 
-## 6. 验收命令
+- 推荐按领域组织 `auth`、`users`、`leads`、`followups`、`tasks`、`dashboard`、`health` 等包。
+- Controller 不写 SQL，不承载跨资源业务规则，不直接调用 FastAPI。
+- Service 负责权限后的业务规则、事务边界、组织归属和错误码。
+- Repository/DAO 集中封装 JdbcTemplate 查询；所有值使用参数绑定；排序字段只能来自服务端白名单。
+- DTO 使用明确的 Java record/class 和 Bean Validation，禁止裸 `Object` 作为业务 DTO；响应统一为 `{ data, meta, error }`。
+- 时间以 UTC 的 `Instant`/ISO 8601 传输；数据库时间字段使用 `timestamptz`。
+- 密码、JWT secret、数据库 URL、Redis URL 和 AI 服务凭据只来自环境变量；日志不得记录密码、token、SQL secret、完整手机号或邮箱。
 
-以下命令是基线脚本名称；初始化项目时必须在根 `package.json` 中提供对应脚本。
+### Python AI
+
+- FastAPI 路由只做协议适配，Pydantic 模型负责输入输出校验。
+- AI 服务只处理 AI 输入和输出，不访问业务数据库，不保存业务状态。
+- 内部接口必须有超时、可观测性和最小必要字段；不得把浏览器请求直接转发为未鉴权的 AI 请求。
+
+## 4. Prisma 与 Java 数据模型对齐
+
+- `prisma/schema.prisma` 是 PostgreSQL 表、列、枚举、约束和关系的声明来源；`prisma/migrations` 是部署来源。已应用到共享环境的 migration 不得修改，只能新增 migration。
+- Prisma 仅用于 schema/migration 工具链；Java API 使用 JdbcTemplate 访问相同表，禁止在 `apps/api` 引入 Prisma ORM 或第二套 ORM。
+- 数据库列使用 `snake_case`，Java 属性、DTO 字段和 API JSON 使用 `camelCase`；SQL 必须显式列出映射，不能依赖 `SELECT *`。
+- UUID、可空性、长度、默认值、唯一约束、外键和枚举值必须与 schema 一一对应。Java 枚举的持久化值必须与 PostgreSQL/接口契约的字面值一致，不得只依赖 Java 常量名。
+- `organization_id` 是组织隔离的必要条件。所有读写、关联和批量操作都必须在 SQL 或 Service 层校验组织归属，不能信任客户端传入的组织 ID。
+- `timestamptz` 对应 Java `Instant`，API 使用 UTC ISO 8601；前端仅在展示层转换用户时区。
+- 本项目不启用 Hibernate/JPA 自动建表或 `ddl-auto`。若未来新增 Java Entity，只能作为明确的读写映射模型，必须逐字段核对 Prisma schema，并由 migration 管理数据库结构。
+- 结构整理不改变表、字段、索引、枚举或约束；需要变更时必须同时更新 schema、migration、Java 映射、API 契约和测试。
+
+## 5. Java 调用 FastAPI
+
+- 浏览器永远不直接调用 `AI_SERVICE_URL`；所有 AI 请求由 Java API 在服务端发起。
+- Java 先完成 access token、RBAC、组织归属和资源可见性校验，再提取最小必要字段调用 FastAPI，并在调用前脱敏手机号、邮箱、token 等敏感信息。
+- AI 地址只来自环境变量 `AI_SERVICE_URL`。调用必须设置连接/读取超时、限制请求体，按接口幂等性决定是否有限重试；禁止无限重试和静默降级为错误成功。
+- FastAPI 返回值必须经过 Java DTO 校验和错误映射，不把内部堆栈、服务地址或供应商密钥返回给前端。
+- Java 日志记录 request ID、用户 ID、组织 ID 和调用耗时，不记录完整 prompt、token 或客户敏感数据。
+
+## 6. Git 规则
+
+- 仓库只允许 `main` 和 `feature` 两个分支。开发、修复、文档和重构都在 `feature` 完成。
+- 禁止创建、切换、推送任何其他分支；禁止直接 push `main`、force push 或自动合并 Pull Request。
+- 提交使用 Conventional Commits：`feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`chore:`；标题使用英文祈使句且不超过 72 个字符。
+- 一个提交只解决一个可回滚主题；不得提交 `.env`、真实 token、客户数据、构建产物、coverage、数据库 dump 或临时文件。
+- Pull Request 必须说明背景、方案、测试命令、迁移说明；涉及 UI 时附截图。合并前必须通过 CI。
+
+## 7. 验收命令
+
+仓库根目录执行：
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -92,15 +112,27 @@ pnpm typecheck
 pnpm test
 pnpm test:e2e
 pnpm build
+mvn -f apps/api/pom.xml test
+pnpm -C apps/web lint
+pnpm -C apps/web build
+python -m compileall apps/ai
 docker compose config
 docker compose up -d postgres redis
-pnpm --filter api prisma:generate
-pnpm --filter api prisma:migrate:deploy
 docker compose down
 ```
 
-本地提交前至少运行 `pnpm lint; pnpm format:check; pnpm typecheck; pnpm test`。涉及认证、权限、迁移或关键流程时必须追加 `pnpm test:e2e`。CI 失败不得以“本地可用”替代修复。
+本次结构整理的强制验收命令为：
 
-## 7. Definition of Done
+```powershell
+mvn -f apps/api/pom.xml test
+pnpm -C apps/web lint
+pnpm -C apps/web build
+python -m compileall apps/ai
+docker compose config
+```
 
-功能只有同时满足以下条件才算完成：需求和权限已更新；DTO、错误码和 OpenAPI 已更新；有单元测试，关键用户流程有 E2E；迁移可重复部署；日志和审计字段齐全；上述验收命令通过；文档与实现一致。
+涉及认证、权限、迁移或关键流程时追加关键 E2E。验收失败必须修复或在实施日志中记录明确的环境阻断原因，不能以“本地可用”替代。
+
+## 8. Definition of Done
+
+目录边界、运行命令、Compose 路径、环境变量和文档保持一致；不引入新业务逻辑、不修改数据库结构；Java、Python、前端和 Prisma 的契约可追溯；日志和审计上下文可关联；强制验收命令通过。

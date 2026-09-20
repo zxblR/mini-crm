@@ -1,4 +1,38 @@
+name: mini-crm
+
 services:
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      API_PORT: 3000
+      JAVA_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-mini_crm}
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_password}
+      AI_SERVICE_URL: http://ai:8000
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-a-long-development-secret}
+      JWT_ACCESS_EXPIRATION_SECONDS: ${JWT_ACCESS_EXPIRATION_SECONDS:-900}
+      IMPORT_STORAGE_DIR: /app/data/imports
+    ports:
+      - '${API_PORT:-3000}:3000'
+    volumes:
+      - api_imports:/app/data/imports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai:
+        condition: service_started
+
+  ai:
+    build:
+      context: .
+      dockerfile: infra/docker/ai.Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${AI_PORT:-8000}:8000'
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -7,7 +41,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_password}
       POSTGRES_DB: ${POSTGRES_DB:-mini_crm}
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '${POSTGRES_PORT:-55432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,5 +64,6 @@ services:
       retries: 10
 
 volumes:
+  api_imports:
   postgres_data:
   redis_data:

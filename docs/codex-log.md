@@ -1,10 +1,114 @@
 # Codex Implementation Log
 
+> 说明：早期阶段条目按当时实际环境保留，其中的旧路径、旧端口和 NestJS 描述属于历史记录；当前文档统一使用 `apps/api`、Java Spring Boot、Java API `8080` 和 PostgreSQL 宿主端口 `55432`。
+
 ## 2026-09-18 阶段 0：工程骨架
 
 - 分支：`feature`（未创建、切换或推送其他分支）。
 - 范围：建立 pnpm workspace、Vue/Vite 前端空壳、NestJS API 空壳、共享包、PostgreSQL/Redis Compose、环境变量模板和质量配置。
 - API 占位：`GET /api/health`。
 - Web 占位：登录页和工作台页；未实现登录、线索、跟进或报表业务。
-- 约束：未修改已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md` 和 `AGENTS.md`。
+- 约束：阶段 0 初始化时未修改已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md` 和 `AGENTS.md`；后续版本核对阶段曾更新 `AGENTS.md` 的版本声明。
 - 验收记录：Node `v22.20.0`、pnpm `11.19.0` 可用；Docker CLI 当前环境不可用，`docker compose up -d` 待具备 Docker 环境后重试。
+
+## 阶段 0：仓库骨架初始化
+- 提示词：按阶段 0 计划，只在 `feature` 分支搭建 pnpm workspace、Vue3/Vite 前端空壳、NestJS API 空壳、共享包、PostgreSQL/Redis Compose、环境变量、质量配置和阶段日志；不写业务逻辑，不修改已审核的五份 `docs` 文档。
+- 生成文件：根目录 workspace/TypeScript/ESLint/Prettier 配置、`.env.example`、`docker-compose.yml`、`README.md`；`apps/web` Vue3 登录页与工作台占位；`apps/api` NestJS `GET /api/health`、Prisma 空 schema；`packages/shared` 共享常量和类型；`pnpm-lock.yaml`；本日志文件。
+- 新增行数：8,344 行（按生成文件当前行数统计，其中 `pnpm-lock.yaml` 7,705 行，其余配置、源码和文档 639 行）。
+- 运行命令：`pnpm install`；`pnpm lint`；`pnpm --filter api build`；`pnpm --filter web build`；`docker compose up -d`；`node apps/api/dist/main.js`；`Invoke-RestMethod http://localhost:3000/api/health`；`git diff --check`。
+- 测试结果：`pnpm install` 完成；`pnpm lint` 通过；API build 通过；Web build 通过并生成 `apps/web/dist`；健康接口实际返回 `{ "status": "ok", "service": "api" }`；`git diff --check` 无代码空白错误；Docker Compose 未执行成功。
+- 出现的问题：初始安装受 registry 权限和 pnpm 非交互模块清理影响；pnpm 供应链策略拒绝锁文件中的近期发布传递依赖；API 初次构建无法解析 workspace shared 类型；Web 初次构建缺少 Vue SFC 类型声明和 `@element-plus/icons-vue` 依赖；当前机器没有 Docker CLI。
+- 如何修复：使用授权网络完成依赖安装；按 pnpm 11 的 `allowBuilds` 配置允许必要依赖安装脚本；给 shared 包补充 `main`/`types`；添加 `apps/web/src/env.d.ts` 并声明图标依赖；将根 `packageManager` 与实际 pnpm `11.19.0` 对齐；Docker 环境问题无法在本机修复，保留为验收阻断项。
+- 人工修改：版本核对后将 `AGENTS.md` 的 Node/pnpm/TypeScript 及前后端依赖版本改为当前实际版本；未手工修改构建产物，未切换或推送分支，未提交或合并 PR。
+- 下次改进：阶段开始前先确认 Docker CLI 和 registry 权限；固定并预热 pnpm 版本/依赖缓存后再执行验收；为 workspace 增加统一的依赖一致性检查，避免文档版本与 `package.json` 漂移。
+
+## 阶段 1：数据库与共享类型
+
+提示词：检查阶段 1 验收项；补齐 Prisma migration、seed 和共享类型引用；确认 build、lint、数据库表和日志状态；不新增业务 API 或前端页面。
+生成文件：`apps/api/prisma/schema.prisma` 的 13 个模型；`apps/api/prisma/migrations/migration_lock.toml`；`apps/api/prisma/migrations/20260919000000_init/migration.sql`；`apps/api/prisma/seed.ts`；`packages/shared/src/{api,auth,dashboard,enums,followups,leads,tasks,users}.ts`；Prisma 脚本更新；本日志追加阶段 1 记录。
+新增行数：2,330 行（按工作区相对当前基线的新增行数统计，包含 `pnpm-lock.yaml`；未计入构建产物）。
+运行命令：`pnpm install --frozen-lockfile`；`pnpm --filter api prisma:format`；`pnpm --filter api prisma:validate`；`pnpm --filter api prisma:generate`；`pnpm --filter api prisma:migrate:dev -- --name init`；`pnpm --filter api prisma:seed`；`pnpm --filter api exec tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck prisma/seed.ts`；`pnpm lint`；`pnpm build`；`pnpm --filter api build`；`pnpm --filter web build`；`docker compose config`；`git diff --check`。
+测试结果：依赖安装、schema format/validate、Prisma generate、seed TypeScript 编译、shared/API typecheck、API build、Web build、根 build、lint 和 `git diff --check` 通过；迁移静态包含 13 张表、4 个枚举、28 个外键及索引；共享类型可被 `apps/api/src/health.controller.ts` 引用；路由核对只有既有 `GET /api/health`，前端只有既有登录/工作台占位页；`prisma migrate dev` 因 `localhost:5432` 无 PostgreSQL 失败，seed 因无法连接同一数据库失败；`docker compose config` 因当前环境没有 Docker CLI 失败。
+出现的问题：本机没有可连接的 PostgreSQL 16 实例，也没有 Docker CLI，因此无法在本环境实际应用 migration、执行 seed 或核对运行中的数据库表；全仓 `pnpm format:check` 仍报告既有文件格式差异。
+如何修复：已新增可重复部署的初始 migration、`migration_lock.toml`、幂等 seed 和 `prisma:format`/`prisma:validate`/`prisma:migrate:dev` 脚本；在安装 Docker 并启动 PostgreSQL 后，重新运行 `docker compose up -d postgres redis`、`pnpm --filter api prisma:migrate:dev` 和 `pnpm --filter api prisma:seed` 完成环境级验收。
+人工修改：未修改已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md`；未新增业务 Controller、Service、API 或前端页面；未创建、切换、推送其他分支，未提交或合并 PR。
+下次改进：阶段开始前准备 Docker/PostgreSQL 验证环境；统一现有文件的 Prettier 行尾与格式后再启用 `pnpm format:check`；将 migration deploy、seed 和表清单检查加入 CI。
+
+## 阶段 2：后端基础设施与认证授权（旧 NestJS 实现）
+
+- 分支：`feature`；未创建、切换、推送其他分支，未直接推送 `main`，未 force push，未自动合并 PR。
+- 范围：JWT 登录与当前用户、全局鉴权、RBAC、统一响应、异常过滤、ValidationPipe、Swagger、用户接口、团队接口和 activity logs；未实现线索、跟进、任务、统计、AI 或前端页面。
+- 主要文件：`apps/api/src/{auth,users,teams,common,prisma}`、`apps/api/src/{app.module.ts,main.ts}`、`packages/shared/src/{auth,enums,users,api}.ts`、Prisma schema/migration、`docs/codex-log.md`。
+- 认证：access token 使用 JWT，密码使用 argon2；响应不包含 `passwordHash`。
+- 验收结果：`pnpm --filter api prisma generate`、`pnpm --filter api build`、`pnpm lint`、`pnpm --filter api test` 和额外的 `pnpm --filter api test:e2e` 均通过；单测 2 项通过，认证 HTTP e2e 2 项通过。
+- 注意：尚未在本机启动 PostgreSQL/Docker 实例执行真实数据库迁移和端到端登录；本阶段验证使用 Prisma Client 生成、TypeScript 构建、Guard 单测和 mock 服务 HTTP e2e。
+
+## 阶段 3：后端语言迁移
+
+- 决策：业务 API 迁移到 Java 21 + Spring Boot 3；Vue 前端保持不变；AI 能力拆分为 Python 3.12 + FastAPI 内部服务。
+- 新入口：`apps/api-java` 监听 `3000`，`apps/ai` 监听 `8000`；前端继续使用 `VITE_API_BASE_URL` 访问 Java API。
+- 数据库：沿用既有 PostgreSQL 迁移 SQL，后续由 Java 迁移工具接管；旧 `apps/api` NestJS 代码暂存为迁移参考，不再作为 Compose API 服务。
+- 验证限制：当前机器未安装 Java/Maven，Java 编译和 Spring Boot 测试待安装 JDK 21、Maven 3.9+ 后执行。
+
+## 阶段 3：Java 业务后端重构
+
+- 分支：`feature`；未创建、切换、推送其他分支，未直接推送 `main`，未 force push，未自动合并 PR。
+- 范围：`apps/api-java` 接管认证、用户、团队、线索、阶段、跟进、任务、标签、仪表盘、导入任务、审计和健康检查；Vue 前端与 Python AI 服务保持独立。
+- 认证授权：JWT access/refresh token、refresh token 轮换与撤销、Argon2 密码哈希、`@Public` 公开接口拦截器、全局认证拦截器、`@Roles` RBAC、OWNER/ADMIN/SALES/SUPPORT 组织隔离。
+- 业务能力：完成线索 CRUD、归档/恢复、分配与阶段历史；跟进 CRUD 与下一步任务；任务查询、完成、取消和终态保护；阶段、标签、仪表盘、CSV 异步导入、审计日志和 `/ready` 数据库探针。
+- 工程调整：Java 使用 `JdbcTemplate` 参数化访问既有 PostgreSQL schema；成功/失败响应统一为 `{ data, meta, error }`；所有响应不暴露 `passwordHash`；Docker Compose API 服务切换到 Java 并挂载导入文件卷；前端无业务页面改动。
+- 测试结果：
+  - `mvn "-Dmaven.repo.local=D:\codex\小微团队客户线索管理与智能跟进系统\.m2\repository" test`：9 个 Java 测试通过。
+  - `mvn "-Dmaven.repo.local=D:\codex\小微团队客户线索管理与智能跟进系统\.m2\repository" package -DskipTests`：通过，生成 `apps/api-java/target/mini-crm-api-0.1.0.jar`。
+  - `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`：通过。
+  - `pnpm format:check`：仍受仓库既有 44 个文件格式差异阻断；未执行全仓格式化，避免改写已审核文档。
+- 环境限制：2026-09-19 本机没有 Docker CLI，`localhost:5432` 没有 PostgreSQL；无法执行真实 migration/seed、数据库登录 E2E 和 `docker compose config`。Spring 上下文与 MockMvc 已验证健康接口、统一 request ID、公开路由和未认证 401。
+
+## 2026-09-20：重构后环境复验
+
+- 分支：`feature`；未创建、切换、推送其他分支，未直接推送 `main`，未 force push，未自动合并 PR。
+- 环境：Java `21.0.12.1`、Maven `3.9.16`、Node `22.20.0`、pnpm `11.19.0` 可用；当前执行环境仍找不到 Docker CLI，Python 3.12 也未安装到 PATH。
+- 数据库：`localhost:5432` 的 TCP 端口可连接，但当前默认 Prisma 凭据执行 `prisma migrate deploy/status` 均在 schema engine 阶段失败，未执行 seed；未确认该实例是否为 Mini CRM 数据库。
+- 通过项：Java Maven 测试 9 项全部通过；Java 打包通过；`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 通过。
+- 运行时限制：Java Spring 容器可完成初始化，但当前 Windows/JDK 执行器启动 Tomcat 时在 NIO loopback 管道返回 `java.net.SocketException: Invalid argument: connect`，因此未完成真实 HTTP 登录、权限和 Swagger 验证。
+- 配置修正：新增 `JAVA_DATABASE_URL`，将 Java JDBC 地址与 Prisma 使用的 `DATABASE_URL` 分离；Compose API 改用 `JAVA_DATABASE_URL`；根 `pnpm test/build/test:e2e` 改为包含 Java Maven 验收；README 补充迁移、seed 和 Java JDBC 配置步骤。
+- 后续验收：在具备 Docker CLI、Python 3.12 和可确认凭据的环境中执行 `docker compose config`、`docker compose up -d`、Prisma migration/seed、真实登录/权限接口测试和 `docker compose down`。
+
+## 2026-09-20：Java、Docker 与 Python 运行链路复验
+
+- 分支：`feature`；未创建、切换、推送其他分支，未直接推送 `main`，未 force push，未自动合并 PR。
+- 当前运行时：Docker `29.8.0`、Docker Compose `v5.5.1`、Python `3.12.10`、FastAPI `0.115.11`、Uvicorn `0.34.0`、Java `21.0.12.1`、Maven `3.9.16`。
+- 宿主机已有非本项目 PostgreSQL 占用 `5432`，数据库为 `community`，账号为 `postgres`；未停止或修改该容器。本项目默认宿主映射端口统一调整为 `55432`，容器内部仍使用 PostgreSQL `5432`。
+- Compose：`docker compose config` 通过；Java API 和 AI 镜像构建通过；PostgreSQL、Redis、Java API、AI 容器均成功启动，Redis healthy，PostgreSQL healthy，Java API 监听 `3000`，AI 监听 `8000`。
+- 数据库：`pnpm --filter api prisma:migrate:deploy` 在本项目 `55432` 数据库成功应用 1 个 migration；seed 通过 `node --experimental-strip-types prisma/seed.ts` 成功写入演示团队和 3 个用户。直接使用 `tsx` 曾因 Windows Node `uv_os_get_passwd returned ENOMEM` 失败，但不是 seed 或数据库错误。
+- HTTP 验证：`GET /api/health`、`GET /api/ready`、`GET /api/docs`、AI `GET /docs` 均成功；OWNER 登录、`/api/auth/me`、用户列表和当前团队成功；SALES 访问用户列表返回 `403`；无 token 访问受保护接口返回 `401`；未知字段返回 `400`；AI `POST /v1/follow-up-suggestions` 返回 `200`。
+- 安全与审计：登录响应包含 access/refresh token，不返回 `passwordHash`；数据库 `activity_logs` 已记录 3 条 `LOGIN` 操作。
+- 测试：Java Maven 测试 9/9 通过；`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm --filter api prisma:generate`、Python `compileall`、`git diff --check` 和 Compose 配置检查通过。
+- 当前仍存在的环境注意事项：本机用户级 Maven 配置位于不可写的 `C:\.m2`，直接运行 `mvn` 可能失败；使用工作区可写 Maven 仓库或 Docker 构建可通过。共享登录类型已兼容 Java 返回的 refresh token，README seed 命令已修正。
+
+## 2026-09-20：按实际技术栈重构目录
+
+- 分支：`feature`；未创建、切换、推送其他分支，未直接 push `main`，未 force push，未自动合并 PR。
+- 目录移动：
+  - Java Spring Boot 服务由 `apps/api-java` 移至 `apps/api`。
+  - 旧 NestJS 运行时由 `apps/api` 移至 `archive/api-nest`，不再加入 pnpm workspace 或 Compose。
+  - Prisma schema 和 migration 由旧 API 目录移至根目录 `prisma/`；旧 seed 脚本保留在归档目录，根 Prisma 目录只维护 schema/migration。
+  - API/AI Dockerfile 移至 `infra/docker/`，Compose 改用仓库根上下文和新 Dockerfile 路径。
+- 文档与配置：更新 `AGENTS.md`、`README.md`、`.env.example`、`.gitignore`、根 pnpm 脚本和 workspace 构建许可；新增 `docs/architecture.md` 和 `scripts/codex-preflight.sh`。未修改已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md`。
+- 数据库：未修改 schema、migration、表、字段、索引、枚举或约束；PostgreSQL 宿主端口保持 `55432`。
+- 验收结果：
+  - `mvn -f apps/api/pom.xml test`：通过，9 个测试全部通过。
+  - `pnpm -C apps/web lint`：通过。
+  - `pnpm -C apps/web build`：通过，Vite 产物生成成功。
+  - `python -m compileall apps/ai`：通过；由于当前 PowerShell PATH 未注册 Python，使用本机 Python 3.12 可执行文件并临时扩展 PATH 执行同一命令。
+  - `docker compose config`：通过；由于当前 PowerShell PATH 未注册 Docker，使用本机 Docker CLI 并临时扩展 PATH 执行同一命令，未启动容器。
+  - `pnpm install --frozen-lockfile`、`pnpm lint`、`pnpm typecheck`、`git diff --check`、`D:\Git\bin\bash.exe -n scripts/codex-preflight.sh`：通过。
+- 风险与后续：`docs/roadmap.md` 的历史验收文字仍保留 `apps/api-java` 路径，遵守本次不改已审核文档的约束；当前结构和启动命令以 `AGENTS.md`、`README.md`、`docs/architecture.md` 为准。未执行数据库迁移、真实登录 E2E 或 Compose 启动验收，本次仅做目录和构建链路整理。
+
+## 2026-09-20：文档路径与端口对齐
+
+- 分支：`feature`；未创建、切换、推送其他分支，未直接 push `main`，未 force push，未自动合并 PR。
+- 更新文档：`docs/roadmap.md`、`docs/prd.md`、`docs/api.md`、`docs/er-diagram.md`、`docs/architecture.md`。
+- 对齐内容：现行文档统一使用 `apps/api`、Java Spring Boot、Java API `8080` 和 PostgreSQL 宿主端口 `55432`；未修改产品流程、字段设计、数据库结构或代码。
+- 历史记录：`docs/codex-log.md` 中早期 NestJS、`apps/api-java` 和 `localhost:3000` 条目保留为历史事实，并在文档说明中标注。
+- 检查：非历史文档不再包含旧路径或旧端口；残留项仅位于本日志的历史段落。

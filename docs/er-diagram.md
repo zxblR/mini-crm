@@ -1,6 +1,8 @@
 # Mini CRM ER Diagram
 
-以下模型以单组织 MVP 为基线。租户业务实体使用 UUID 主键、与生命周期相符的时间字段（`created_at`、`updated_at` 或事件时间，必要时 `deleted_at`），并直接保存 `organization_id`；全局角色字典 `ROLES` 除外，关联表通过复合外键保证组织一致。字段名为数据库 `snake_case`；Prisma 模型名使用 PascalCase 并通过 `@map` 映射。
+以下模型以单组织 MVP 为基线。租户业务实体使用 UUID 主键、与生命周期相符的时间字段（`created_at`、`updated_at` 或事件时间，必要时 `deleted_at`），并直接保存 `organization_id`；全局角色字典 `ROLES` 除外，关联表通过复合外键保证组织一致。字段名为数据库 `snake_case`，Java 使用 JDBC Repository 访问。
+
+运行时说明：Java Spring Boot API 位于 `apps/api`，Python FastAPI 位于 `apps/ai`；本地 Java API 使用 `8080` 端口，PostgreSQL 宿主端口统一为 `55432`。以下实体、字段、关系和约束保持不变。
 
 ```mermaid
 erDiagram
@@ -219,6 +221,6 @@ erDiagram
 - `FOLLOW_UPS` 建立 `(organization_id, lead_id, occurred_at DESC)` 索引；删除接口只写 `deleted_at`。`TASKS` 建立 `(organization_id, assignee_id, status, due_at)` 和 `(organization_id, lead_id, created_at DESC)` 索引。
 - `STAGE_HISTORIES` 建立 `(organization_id, lead_id, changed_at DESC)` 索引；`AUDIT_LOGS` 建立 `(organization_id, created_at DESC)`、`(organization_id, actor_id, created_at DESC)`、`(organization_id, resource_type, resource_id)` 索引。
 - `IMPORT_JOBS` 建立 `(organization_id, created_by_id, created_at DESC)` 和 `(organization_id, status, created_at)` 索引；原文件和错误文件只存对象键，不在数据库保存 CSV 内容。
-- 状态和类型使用 Prisma/PostgreSQL 枚举：任务状态 `pending|completed|cancelled`，导入状态 `queued|running|completed|failed`，跟进类型 `call|wechat|email|meeting|other`。逾期不是持久化状态，而是 `status=pending AND due_at<now()` 的派生结果。
+- 状态和类型使用 PostgreSQL 枚举，并由 Java 枚举映射：任务状态 `pending|completed|cancelled`，导入状态 `queued|running|completed|failed`，跟进类型 `call|wechat|email|meeting|other`。逾期不是持久化状态，而是 `status=pending AND due_at<now()` 的派生结果。
 - `TASKS` 使用 CHECK 约束保证 `completed` 仅设置 `completed_at`、`cancelled` 仅设置 `cancelled_at`、`pending` 两者均为空；导入计数字段不得为负，且 `succeeded_count + failed_count <= processed_count <= total_count`。
 - 阶段历史和审计日志只追加，不提供普通用户更新或删除接口；保留策略由后续合规需求另行定义。
