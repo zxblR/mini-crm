@@ -34,6 +34,18 @@ enum TaskStatus {
   @@map("task_status")
 }
 
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  proposal
+  negotiation
+  won
+  lost
+
+  @@map("lead_status")
+}
+
 enum ImportJobStatus {
   queued
   running
@@ -163,17 +175,21 @@ model Lead {
   industry        String?        @db.VarChar(80)
   region          String?        @db.VarChar(100)
   notes           String?        @db.Text
-  stageId         String         @map("stage_id") @db.Uuid
+  stageId         String?        @map("stage_id") @db.Uuid
+  status          LeadStatus
   ownerId         String?        @map("owner_id") @db.Uuid
   createdById     String         @map("created_by_id") @db.Uuid
   nextFollowUpAt  DateTime?      @map("next_follow_up_at") @db.Timestamptz(3)
   archivedAt      DateTime?      @map("archived_at") @db.Timestamptz(3)
   wonAt           DateTime?      @map("won_at") @db.Timestamptz(3)
   lostAt          DateTime?      @map("lost_at") @db.Timestamptz(3)
+  closedAt        DateTime?      @map("closed_at") @db.Timestamptz(3)
+  outcomeNote     String?        @map("outcome_note") @db.VarChar(500)
+  lostReason      String?        @map("lost_reason") @db.VarChar(200)
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  stage           PipelineStage  @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  stage           PipelineStage? @relation(fields: [stageId], references: [id], onDelete: Restrict)
   owner           User?          @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdBy       User           @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Restrict)
   tags            LeadTag[]
@@ -184,6 +200,7 @@ model Lead {
   @@index([organizationId, archivedAt, updatedAt])
   @@index([organizationId, ownerId, archivedAt])
   @@index([organizationId, stageId, archivedAt])
+  @@index([organizationId, status, updatedAt])
   @@index([organizationId, source, createdAt])
   @@index([organizationId, normalizedEmail])
   @@index([organizationId, normalizedPhone])
@@ -220,7 +237,9 @@ model StageHistory {
   id          String         @id @default(uuid()) @db.Uuid
   leadId      String         @map("lead_id") @db.Uuid
   fromStageId String?        @map("from_stage_id") @db.Uuid
-  toStageId   String         @map("to_stage_id") @db.Uuid
+  toStageId   String?        @map("to_stage_id") @db.Uuid
+  fromStatus  LeadStatus?    @map("from_status")
+  toStatus    LeadStatus     @map("to_status")
   actorId     String         @map("actor_id") @db.Uuid
   note        String?        @db.VarChar(500)
   outcomeNote String?        @map("outcome_note") @db.VarChar(500)
@@ -228,7 +247,7 @@ model StageHistory {
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   lead        Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
   fromStage   PipelineStage? @relation("FromStage", fields: [fromStageId], references: [id], onDelete: Restrict)
-  toStage     PipelineStage  @relation("ToStage", fields: [toStageId], references: [id], onDelete: Restrict)
+  toStage     PipelineStage? @relation("ToStage", fields: [toStageId], references: [id], onDelete: Restrict)
   actor       User           @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([leadId, createdAt])

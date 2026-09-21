@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/api/audit-logs", "/api/v1/audit-logs"})
+@RequestMapping("/api/v1/audit-logs")
 @Roles({RoleCode.OWNER, RoleCode.ADMIN})
 public class AuditLogController {
   private final JdbcTemplate jdbc;

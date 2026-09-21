@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api", "/api/v1"})
+@RequestMapping("/api/v1")
 public class MeController {
   @GetMapping("/me")
   public ApiEnvelope<SecurityUser> me(Authentication authentication) {

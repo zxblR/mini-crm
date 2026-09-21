@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/api/tags", "/api/v1/tags"})
+@RequestMapping("/api/v1/tags")
 public class TagController {
   private final TagService service;
   public TagController(TagService service) { this.service = service; }

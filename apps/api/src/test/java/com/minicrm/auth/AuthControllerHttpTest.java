@@ -41,7 +41,7 @@ class AuthControllerHttpTest {
     when(authService.login(eq("admin@example.com"), eq("password123"), any()))
         .thenReturn(Map.of("accessToken", "access-token", "expiresIn", 900));
 
-    mockMvc.perform(post("/api/auth/login")
+    mockMvc.perform(post("/api/v1/auth/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content(new ObjectMapper().writeValueAsString(
                 Map.of("account", "admin@example.com", "password", "password123"))))
@@ -52,7 +52,7 @@ class AuthControllerHttpTest {
 
   @Test
   void protectedMeRequiresAuthentication() throws Exception {
-    mockMvc.perform(get("/api/auth/me"))
+    mockMvc.perform(get("/api/v1/auth/me"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
         .andExpect(jsonPath("$.data").doesNotExist());

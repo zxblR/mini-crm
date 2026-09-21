@@ -15,8 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@RestController
-@RequestMapping({"/api/pipeline-stages", "/api/v1/pipeline-stages"})
+@Deprecated(forRemoval = false)
 public class PipelineStageController {
   private final PipelineStageService service;
 

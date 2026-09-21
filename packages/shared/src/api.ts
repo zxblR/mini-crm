@@ -56,6 +56,9 @@ export interface ApiHealthResponse {
   service: 'api';
 }
 
+export const LEAD_DUPLICATE = 'LEAD_DUPLICATE' as const;
+export const STAGE_INVALID_TRANSITION = 'STAGE_INVALID_TRANSITION' as const;
+
 export const ERROR_CODES = {
   validationFailed: 'VALIDATION_FAILED',
   invalidCredentials: 'AUTH_INVALID_CREDENTIALS',
@@ -65,9 +68,9 @@ export const ERROR_CODES = {
   notFound: 'RESOURCE_NOT_FOUND',
   userDuplicate: 'USER_DUPLICATE',
   lastAdminRequired: 'LAST_ADMIN_REQUIRED',
-  leadDuplicate: 'LEAD_DUPLICATE',
+  leadDuplicate: LEAD_DUPLICATE,
   stageConflict: 'STAGE_CONFLICT',
-  invalidTransition: 'STAGE_INVALID_TRANSITION',
+  invalidTransition: STAGE_INVALID_TRANSITION,
   lostReasonRequired: 'LOST_REASON_REQUIRED',
   outcomeNoteRequired: 'OUTCOME_NOTE_REQUIRED',
   terminalTask: 'TASK_TERMINAL_STATE',

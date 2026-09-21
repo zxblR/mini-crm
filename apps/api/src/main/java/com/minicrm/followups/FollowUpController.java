@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/api", "/api/v1"})
+@RequestMapping("/api/v1")
 public class FollowUpController {
   private final FollowUpService service;
   public FollowUpController(FollowUpService service) { this.service = service; }

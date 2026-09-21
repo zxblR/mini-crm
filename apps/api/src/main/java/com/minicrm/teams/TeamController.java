@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/teams/current", "/api/v1/teams/current"})
+@RequestMapping("/api/v1/teams/current")
 public class TeamController {
   private final TeamService service;
 

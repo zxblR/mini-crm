@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/dashboard", "/api/v1/dashboard"})
+@RequestMapping("/api/v1/dashboard")
 public class DashboardController {
   private final DashboardService service;
   public DashboardController(DashboardService service) { this.service = service; }

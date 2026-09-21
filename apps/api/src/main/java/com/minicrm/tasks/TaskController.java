@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/api/tasks", "/api/v1/tasks"})
+@RequestMapping("/api/v1/tasks")
 public class TaskController {
   private final TaskService service;
   public TaskController(TaskService service) { this.service = service; }

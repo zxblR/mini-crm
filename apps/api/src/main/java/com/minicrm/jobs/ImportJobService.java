@@ -1,14 +1,17 @@
 package com.minicrm.jobs;
 
+import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.ImportJobStatus;
 import com.minicrm.common.SecurityUser;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,18 +25,24 @@ import java.util.UUID;
 @Service
 public class ImportJobService {
   private final JdbcTemplate jdbc;
-  private final ImportJobProcessor processor;
   private final Path storageDirectory;
+  private final ActivityLogService activityLogService;
 
+  @Autowired
   public ImportJobService(
       JdbcTemplate jdbc,
-      ImportJobProcessor processor,
-      @Value("${app.import.storage-dir:./data/imports}") String storageDirectory) {
+      @Value("${app.import.storage-dir:./data/imports}") String storageDirectory,
+      ActivityLogService activityLogService) {
     this.jdbc = jdbc;
-    this.processor = processor;
     this.storageDirectory = Paths.get(storageDirectory).toAbsolutePath().normalize();
+    this.activityLogService = activityLogService;
   }
 
+  public ImportJobService(JdbcTemplate jdbc, String storageDirectory) {
+    this(jdbc, storageDirectory, null);
+  }
+
+  @Transactional
   public Map<String, Object> create(
       SecurityUser actor,
       MultipartFile file,
@@ -82,7 +91,9 @@ public class ImportJobService {
         ImportJobStatus.queued.name(),
         safeName,
         destination.toString());
-    processor.processAsync(id, actor.organizationId(), actor.id(), destination);
+    if (activityLogService != null) {
+      activityLogService.record(actor, "IMPORT_LEADS", "IMPORT_JOB", id, null, request);
+    }
     return Map.of("jobId", id, "status", ImportJobStatus.queued.name());
   }
 

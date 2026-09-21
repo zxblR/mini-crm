@@ -9,5 +9,5 @@ RUN mvn -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /build/target/mini-crm-api-0.1.0.jar app.jar
-EXPOSE 3000
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
