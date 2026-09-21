@@ -28,7 +28,7 @@ class ApiApplicationContextTest {
 
   @Test
   void healthIsPublic() throws Exception {
-    mockMvc.perform(get("/api/health"))
+    mockMvc.perform(get("/api/v1/health"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("ok"))
         .andExpect(jsonPath("$.meta.requestId").isNotEmpty());
@@ -36,7 +36,7 @@ class ApiApplicationContextTest {
 
   @Test
   void protectedEndpointReturnsUniformUnauthorizedResponse() throws Exception {
-    mockMvc.perform(get("/api/auth/me"))
+    mockMvc.perform(get("/api/v1/auth/me"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
         .andExpect(jsonPath("$.meta.requestId").isNotEmpty());

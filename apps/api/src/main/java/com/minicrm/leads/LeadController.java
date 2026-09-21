@@ -4,7 +4,6 @@ import com.minicrm.common.ApiEnvelope;
 import com.minicrm.common.CurrentUser;
 import com.minicrm.common.RoleCode;
 import com.minicrm.common.Roles;
-import com.minicrm.common.SecurityUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
@@ -18,21 +17,24 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/api/leads", "/api/v1/leads"})
+@RequestMapping("/api/v1/leads")
 public class LeadController {
   private final LeadService service;
 
-  public LeadController(LeadService service) { this.service = service; }
+  public LeadController(LeadService service) {
+    this.service = service;
+  }
 
   @GetMapping
   public ApiEnvelope<List<Map<String, Object>>> list(Authentication authentication,
       @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer pageSize,
-      @RequestParam(required = false) String keyword, @RequestParam(required = false) UUID stageId,
+      @RequestParam(required = false) String keyword, @RequestParam(required = false) String status,
       @RequestParam(required = false) UUID ownerId, @RequestParam(required = false) String source,
       @RequestParam(required = false) String from, @RequestParam(required = false) String to,
       @RequestParam(required = false) Boolean archived, @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortOrder) {
-    var result = service.list(CurrentUser.require(authentication), new LeadService.Query(page, pageSize, keyword, stageId, ownerId, source, from, to, archived, sortBy, sortOrder));
+    var result = service.list(CurrentUser.require(authentication),
+        new LeadService.Query(page, pageSize, keyword, status, ownerId, source, from, to, archived, sortBy, sortOrder));
     return ApiEnvelope.ok(result.items(), result.meta());
   }
 
@@ -45,7 +47,8 @@ public class LeadController {
   @Roles({RoleCode.OWNER, RoleCode.ADMIN, RoleCode.SALES})
   public ResponseEntity<ApiEnvelope<Map<String, Object>>> create(Authentication authentication,
       @Valid @RequestBody LeadService.CreateRequest request, HttpServletRequest httpRequest) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(ApiEnvelope.ok(service.create(CurrentUser.require(authentication), request, httpRequest)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(
+        ApiEnvelope.ok(service.create(CurrentUser.require(authentication), request, httpRequest)));
   }
 
   @PatchMapping("/{id}")
@@ -55,12 +58,14 @@ public class LeadController {
   }
 
   @PostMapping("/{id}/archive")
-  public ApiEnvelope<Map<String, Object>> archive(Authentication authentication, @PathVariable UUID id, HttpServletRequest request) {
+  public ApiEnvelope<Map<String, Object>> archive(Authentication authentication, @PathVariable UUID id,
+      HttpServletRequest request) {
     return ApiEnvelope.ok(service.archive(CurrentUser.require(authentication), id, false, request));
   }
 
   @PostMapping("/{id}/restore")
-  public ApiEnvelope<Map<String, Object>> restore(Authentication authentication, @PathVariable UUID id, HttpServletRequest request) {
+  public ApiEnvelope<Map<String, Object>> restore(Authentication authentication, @PathVariable UUID id,
+      HttpServletRequest request) {
     return ApiEnvelope.ok(service.archive(CurrentUser.require(authentication), id, true, request));
   }
 
@@ -78,10 +83,10 @@ public class LeadController {
     return ApiEnvelope.ok(service.batchAssign(CurrentUser.require(authentication), request, httpRequest));
   }
 
-  @PostMapping("/{id}/stage")
-  public ApiEnvelope<Map<String, Object>> changeStage(Authentication authentication, @PathVariable UUID id,
-      @Valid @RequestBody LeadService.ChangeStageRequest request, HttpServletRequest httpRequest) {
-    return ApiEnvelope.ok(service.changeStage(CurrentUser.require(authentication), id, request, httpRequest));
+  @PostMapping("/{id}/status")
+  public ApiEnvelope<Map<String, Object>> changeStatus(Authentication authentication, @PathVariable UUID id,
+      @Valid @RequestBody LeadService.ChangeStatusRequest request, HttpServletRequest httpRequest) {
+    return ApiEnvelope.ok(service.changeStatus(CurrentUser.require(authentication), id, request, httpRequest));
   }
 
   public record AssignRequest(@NotNull UUID ownerId) {}

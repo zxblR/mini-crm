@@ -5,6 +5,16 @@ export enum RoleCode {
   Support = 'SUPPORT',
 }
 
+export enum LeadStatus {
+  New = 'new',
+  Contacted = 'contacted',
+  Qualified = 'qualified',
+  Proposal = 'proposal',
+  Negotiation = 'negotiation',
+  Won = 'won',
+  Lost = 'lost',
+}
+
 export enum FollowUpType {
   Call = 'call',
   Wechat = 'wechat',

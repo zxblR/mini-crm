@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api", "/api/v1"})
+@RequestMapping("/api/v1")
 @Public
 public class HealthController {
   private final JdbcTemplate jdbc;

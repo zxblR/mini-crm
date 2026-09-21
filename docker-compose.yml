@@ -7,7 +7,7 @@ services:
       dockerfile: infra/docker/api.Dockerfile
     restart: unless-stopped
     environment:
-      API_PORT: 3000
+      API_PORT: 8080
       JAVA_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-mini_crm}
       POSTGRES_USER: ${POSTGRES_USER:-crm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_password}
@@ -16,7 +16,7 @@ services:
       JWT_ACCESS_EXPIRATION_SECONDS: ${JWT_ACCESS_EXPIRATION_SECONDS:-900}
       IMPORT_STORAGE_DIR: /app/data/imports
     ports:
-      - '${API_PORT:-3000}:3000'
+      - '${API_PORT:-8080}:8080'
     volumes:
       - api_imports:/app/data/imports
     depends_on:

@@ -14,7 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/auth", "/api/v1/auth"})
+@RequestMapping("/api/v1/auth")
 public class AuthController {
   private final AuthService authService;
 

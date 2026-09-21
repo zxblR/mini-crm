@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Deprecated(forRemoval = false)
 @Service
 public class PipelineStageService {
   private final JdbcTemplate jdbc;

@@ -56,7 +56,7 @@ archive         旧 NestJS 迁移参考，不参与运行时
    mvn -f apps/api/pom.xml spring-boot:run
    ```
 
-   健康检查：`http://localhost:3000/api/health`；就绪检查：`http://localhost:3000/api/ready`；OpenAPI：`http://localhost:3000/api/docs`。
+   健康检查：`http://localhost:8080/api/v1/health`；就绪检查：`http://localhost:8080/api/v1/ready`；OpenAPI：`http://localhost:8080/api/docs`。
 
 6. 启动 AI 服务：
 

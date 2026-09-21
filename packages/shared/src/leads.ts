@@ -1,17 +1,12 @@
 import type { PageQuery } from './api';
-import type { SortOrder, TimelineEventType } from './enums';
+import type {
+  ImportJobStatus,
+  LeadStatus,
+  SortOrder,
+  TimelineEventType,
+} from './enums';
 
-export interface PipelineStage {
-  id: string;
-  code: string;
-  name: string;
-  color: string;
-  sortOrder: number;
-  isDefault: boolean;
-  isWon: boolean;
-  isLost: boolean;
-  isActive: boolean;
-}
+export type OpenLeadStatus = Exclude<LeadStatus, LeadStatus.Won | LeadStatus.Lost>;
 
 export interface Tag {
   id: string;
@@ -34,11 +29,15 @@ export interface LeadSummary {
   source: string;
   industry: string | null;
   region: string | null;
+  ownerId: string | null;
   owner: LeadOwner | null;
-  stage: PipelineStage;
+  status: LeadStatus;
   tags: Tag[];
   nextFollowUpAt: string | null;
   archivedAt: string | null;
+  closedAt: string | null;
+  outcomeNote: string | null;
+  lostReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,7 +60,7 @@ export interface TimelineEvent {
 
 export interface LeadQuery extends PageQuery {
   keyword?: string;
-  stageId?: string;
+  status?: LeadStatus;
   ownerId?: string;
   source?: string;
   from?: string;
@@ -71,7 +70,9 @@ export interface LeadQuery extends PageQuery {
   sortOrder?: SortOrder;
 }
 
-export interface CreateLeadInput {
+export type LeadExportQuery = Omit<LeadQuery, 'page' | 'pageSize'>;
+
+export interface CreateLeadRequest {
   name?: string | null;
   company?: string | null;
   phone?: string | null;
@@ -80,28 +81,86 @@ export interface CreateLeadInput {
   industry?: string | null;
   region?: string | null;
   notes?: string | null;
-  stageId?: string;
+  status?: OpenLeadStatus;
   ownerId?: string | null;
   tagIds?: string[];
   nextFollowUpAt?: string | null;
 }
 
-export type UpdateLeadInput = Partial<Omit<CreateLeadInput, 'stageId'>>;
+export interface UpdateLeadRequest {
+  name?: string | null;
+  company?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  source?: string;
+  industry?: string | null;
+  region?: string | null;
+  notes?: string | null;
+  ownerId?: string | null;
+  tagIds?: string[];
+  nextFollowUpAt?: string | null;
+}
 
-export interface ChangeStageInput {
-  stageId: string;
+export interface ChangeLeadStatusRequest {
+  status?: LeadStatus;
   note?: string | null;
   outcomeNote?: string | null;
   lostReason?: string | null;
 }
 
-export interface StageHistory {
+export interface LeadStatusHistory {
   id: string;
-  fromStage: PipelineStage | null;
-  toStage: PipelineStage;
+  fromStatus: LeadStatus | null;
+  toStatus: LeadStatus;
   note: string | null;
   outcomeNote: string | null;
   lostReason: string | null;
   actor: LeadOwner;
   createdAt: string;
 }
+
+export interface ChangeLeadStatusResponse {
+  lead: LeadSummary;
+  history: LeadStatusHistory;
+}
+
+export interface AssignLeadRequest {
+  ownerId: string;
+}
+
+export interface BatchAssignLeadsRequest {
+  leadIds: string[];
+  ownerId: string;
+}
+
+export interface BatchAssignLeadsResponse {
+  updated: number;
+  leadIds: string[];
+}
+
+export interface LeadArchiveResponse {
+  id: string;
+  archivedAt: string | null;
+}
+
+export interface LeadImportAccepted {
+  jobId: string;
+  status: ImportJobStatus.Queued;
+}
+
+export interface LeadImportJob {
+  id: string;
+  type: 'lead_import';
+  status: ImportJobStatus;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  errorFileUrl: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export type CreateLeadInput = CreateLeadRequest;
+export type UpdateLeadInput = UpdateLeadRequest;
+export type ChangeStageInput = ChangeLeadStatusRequest;
+export type StageHistory = LeadStatusHistory;
