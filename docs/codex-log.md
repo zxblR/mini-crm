@@ -139,3 +139,11 @@
   - 仅修这两处，未改业务逻辑。
 - 环境修正：Git `safe.directory` 警告，已通过 `git config --global --add safe.directory "D:/codex/小微团队客户线索管理与智能跟进系统"` 修正。
 - 下次改进：生成多构造函数 Service 时默认加 `@Autowired`；生成代码后立即跑 `mvn test`，不要把编译期问题留到验收；验收命令由本机执行，结果粘回 Codex。
+
+## 2026-09-22：阶段 4 跟进、任务与 Timeline 扩展
+
+- 范围：补齐 FollowUp 软删除后的 `nextFollowUpAt` 事务重算、自动任务幂等、负责人无效跳过告警、任务今日列表、任务提醒超时扫描、Timeline UNION ALL 分页和共享 TypeScript 类型。
+- 事件：新增 `ActivityLogEvents` 常量类，集中维护 `CREATE_FOLLOW_UP`、`UPDATE_FOLLOW_UP`、`DELETE_FOLLOW_UP`、`CREATE_TASK`、`UPDATE_TASK`、`COMPLETE_TASK`、`CANCEL_TASK`、`SKIP_TASK_AUTO_CREATE` 及负责人原因值。
+- Timeline：阶段历史、跟进、任务操作日志统一使用 `UNION ALL`，按 `occurred_at DESC, created_at DESC, id DESC` 排序并使用 `LIMIT/OFFSET`；软删除跟进保留并标记 `deleted: true`，普通 FollowUp 列表继续过滤软删除。
+- 调度：新增 `TaskReminderScheduler`，默认关闭，生产通过 `app.scheduler.task-reminder.*` 显式开启；扫描使用 `FOR UPDATE SKIP LOCKED`，仅领取 pending 且尚未提醒的超时任务。
+- 验收：本次未在 Codex 中运行 Maven、pnpm、Python、Docker 或数据库命令；需由人工执行下方验收命令并记录结果。

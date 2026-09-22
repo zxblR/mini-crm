@@ -1,6 +1,7 @@
 package com.minicrm.tasks;
 
 import com.minicrm.common.ActivityLogService;
+import com.minicrm.common.ActivityLogEvents;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.PageSupport;
@@ -54,6 +55,13 @@ public class TaskService {
     return new PageSupport.Result<>(items, PageSupport.meta(paging, total == null ? 0 : total));
   }
 
+  public PageSupport.Result<Map<String, Object>> today(SecurityUser actor, Integer page, Integer pageSize) {
+    Instant start = Instant.now().atZone(java.time.ZoneOffset.UTC).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    Instant end = start.plus(java.time.Duration.ofDays(1));
+    return list(actor, new Query(page, pageSize, "pending", start.toString(),
+        end.minusMillis(1).toString(), null, null));
+  }
+
   public Map<String, Object> get(SecurityUser actor, UUID id) {
     Map<String, Object> task = jdbc.query("SELECT t.id, t.organization_id, t.lead_id, l.name AS lead_name, t.title, t.due_at, t.status, t.resolution_note, t.completed_at, t.cancelled_at, t.created_at, t.assignee_id, u.name AS assignee_name FROM tasks t JOIN leads l ON l.id = t.lead_id JOIN users u ON u.id = t.assignee_id WHERE t.id = ? AND t.organization_id = ?", rs -> rs.next() ? task(rs) : null, id, actor.organizationId());
     if (task == null) throw notFound();
@@ -69,7 +77,7 @@ public class TaskService {
     if (!BusinessRules.isAdmin(actor) && request.assigneeId() != null && !actor.id().equals(request.assigneeId())) throw forbidden();
     if (request.assigneeId() != null) ensureUser(request.assigneeId(), actor.organizationId());
     jdbc.update("UPDATE tasks SET title = COALESCE(?, title), due_at = COALESCE(?, due_at), assignee_id = COALESCE(?, assignee_id), updated_at = now() WHERE id = ? AND organization_id = ?", blank(request.title()), request.dueAt(), request.assigneeId(), id, actor.organizationId());
-    activityLogService.record(actor, "UPDATE_TASK", "TASK", id, null, httpRequest);
+    activityLogService.record(actor, ActivityLogEvents.UPDATE_TASK, "TASK", id, null, httpRequest);
     return get(actor, id);
   }
 
@@ -82,7 +90,8 @@ public class TaskService {
     if (target.equals(current)) throw new ApiException(complete ? "TASK_ALREADY_COMPLETED" : "TASK_ALREADY_CANCELLED", complete ? "任务已经完成" : "任务已经取消", HttpStatus.CONFLICT);
     if (!"pending".equals(current)) throw new ApiException("TASK_TERMINAL_STATE", "任务已经处于终态", HttpStatus.CONFLICT);
     jdbc.update("UPDATE tasks SET status = ?::task_status, resolution_note = ?, completed_at = ?, cancelled_at = ?, updated_at = now() WHERE id = ? AND organization_id = ?", target, blank(note), complete ? java.sql.Timestamp.from(Instant.now()) : null, complete ? null : java.sql.Timestamp.from(Instant.now()), id, actor.organizationId());
-    activityLogService.record(actor, complete ? "COMPLETE_TASK" : "CANCEL_TASK", "TASK", id, null, httpRequest);
+    activityLogService.record(actor, complete ? ActivityLogEvents.COMPLETE_TASK : ActivityLogEvents.CANCEL_TASK,
+        "TASK", id, null, httpRequest);
     return get(actor, id);
   }
 

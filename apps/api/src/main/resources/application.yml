@@ -24,6 +24,11 @@ app:
     base-url: ${AI_SERVICE_URL:http://localhost:8000}
   import:
     storage-dir: ${IMPORT_STORAGE_DIR:./data/imports}
+  scheduler:
+    task-reminder:
+      enabled: ${TASK_REMINDER_ENABLED:false}
+      fixed-delay-ms: ${TASK_REMINDER_FIXED_DELAY_MS:60000}
+      batch-size: ${TASK_REMINDER_BATCH_SIZE:100}
 springdoc:
   api-docs:
     path: /api/docs-json

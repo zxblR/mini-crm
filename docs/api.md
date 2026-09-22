@@ -77,7 +77,7 @@
 
 ### `GET /leads/:id`
 
-权限：按线索可见范围。响应：线索详情、标签、当前阶段、负责人、`timeline`（阶段变更/跟进/任务）。
+权限：按线索可见范围。查询可选 `timelinePage,timelinePageSize`（从 1 开始，默认 20，最大 100）。响应：线索详情、标签、当前阶段、负责人、`timeline`（阶段变更/跟进/任务）。
 
 ### `PATCH /leads/:id`
 
@@ -145,6 +145,10 @@
 ### `GET /tasks`
 
 权限：已认证；`OWNER`、`ADMIN`、`SUPPORT` 可读取当前组织任务，`SALES` 只能读取本人任务。查询：`status,dueFrom,dueTo,assigneeId,leadId,page,pageSize`；`SALES` 传入当前组织内其他 `assigneeId` 返回 `403 FORBIDDEN`，传入跨组织 ID 返回 `404 RESOURCE_NOT_FOUND`。响应：任务分页。
+
+### `GET /tasks/today`
+
+权限：同 `GET /tasks`；返回当前 UTC 自然日内的 pending 任务分页，支持 `page,pageSize`。
 
 ### `PATCH /tasks/:id`
 

@@ -23,6 +23,14 @@ public class TaskController {
     return ApiEnvelope.ok(result.items(), result.meta());
   }
 
+  @GetMapping("/today")
+  public ApiEnvelope<List<Map<String, Object>>> today(Authentication authentication,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer pageSize) {
+    var result = service.today(CurrentUser.require(authentication), page, pageSize);
+    return ApiEnvelope.ok(result.items(), result.meta());
+  }
+
   @PatchMapping("/{id}")
   public ApiEnvelope<Map<String, Object>> update(Authentication authentication, @PathVariable UUID id, @Valid @RequestBody TaskService.UpdateRequest request, HttpServletRequest httpRequest) { return ApiEnvelope.ok(service.update(CurrentUser.require(authentication), id, request, httpRequest)); }
 

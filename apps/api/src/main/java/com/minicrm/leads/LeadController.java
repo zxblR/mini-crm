@@ -39,8 +39,10 @@ public class LeadController {
   }
 
   @GetMapping("/{id}")
-  public ApiEnvelope<Map<String, Object>> get(Authentication authentication, @PathVariable UUID id) {
-    return ApiEnvelope.ok(service.get(CurrentUser.require(authentication), id));
+  public ApiEnvelope<Map<String, Object>> get(Authentication authentication, @PathVariable UUID id,
+      @RequestParam(required = false) Integer timelinePage,
+      @RequestParam(required = false) Integer timelinePageSize) {
+    return ApiEnvelope.ok(service.get(CurrentUser.require(authentication), id, timelinePage, timelinePageSize));
   }
 
   @PostMapping

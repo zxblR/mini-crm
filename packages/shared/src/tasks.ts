@@ -24,6 +24,8 @@ export interface TaskQuery extends PageQuery {
   leadId?: string;
 }
 
+export type TodayTaskQuery = PageQuery;
+
 export interface UpdateTaskInput {
   title?: string;
   dueAt?: string;
