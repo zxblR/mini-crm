@@ -100,7 +100,30 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 - 一个提交只解决一个可回滚主题；不得提交 `.env`、真实 token、客户数据、构建产物、coverage、数据库 dump 或临时文件。
 - Pull Request 必须说明背景、方案、测试命令、迁移说明；涉及 UI 时附截图。合并前必须通过 CI。
 
-## 7. 验收命令
+## 7. 执行环境约束
+
+### 允许（无需审批）
+
+- 只读文件访问：ls、find、cat、type、Get-Content、dir
+- git 只读：git status、git branch、git log、git diff、git show
+- 只读检索：grep、Select-String、findstr
+
+### 禁止（必须人工确认）
+
+- git 写操作：add、commit、push、checkout、merge、branch -d、reset
+- 文件写操作：rm、mv、cp、mkdir、Set-Content、Out-File、echo >>
+- 构建运行：mvn、pnpm、docker、python、java -jar
+- 数据库操作：psql、prisma migrate、prisma db push
+- 禁止 push main、禁止 force push、禁止自动合并 PR
+- 禁止创建、切换、推送任何其他分支
+
+### 工作流
+
+- Codex 负责：读文件、写代码、写文档、写测试、出计划。
+- 人工负责：跑构建、跑测试、跑数据库、git 提交、PR 合并。
+- Codex 生成代码后停止，等人工验收。
+
+## 8. 验收命令
 
 仓库根目录执行：
 
@@ -133,6 +156,6 @@ docker compose config
 
 涉及认证、权限、迁移或关键流程时追加关键 E2E。验收失败必须修复或在实施日志中记录明确的环境阻断原因，不能以“本地可用”替代。
 
-## 8. Definition of Done
+## 9. Definition of Done
 
 目录边界、运行命令、Compose 路径、环境变量和文档保持一致；不引入新业务逻辑、不修改数据库结构；Java、Python、前端和 Prisma 的契约可追溯；日志和审计上下文可关联；强制验收命令通过。
