@@ -2,9 +2,11 @@ package com.minicrm.jobs;
 
 import com.minicrm.leads.LeadContactNormalizer;
 import com.minicrm.leads.LeadStatus;
+import com.minicrm.common.JdbcTimeUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(prefix = "app.import", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ImportJobWorker {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactionTemplate;
@@ -147,14 +150,14 @@ public class ImportJobWorker {
         INSERT INTO leads
           (id, organization_id, name, company, phone, normalized_phone, email, normalized_email,
            source, industry, region, notes, status, owner_id, created_by_id,
-           next_follow_up_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::lead_status, ?, ?, ?, now())
+           next_follow_up_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::lead_status, ?, ?, ?, now(), now())
         """, UUID.randomUUID(), job.organizationId(), LeadContactNormalizer.blank(name),
         LeadContactNormalizer.blank(company), LeadContactNormalizer.blank(value(record, "phone")), phone,
         LeadContactNormalizer.blank(value(record, "email")), email, source.trim(),
         LeadContactNormalizer.blank(value(record, "industry")), LeadContactNormalizer.blank(value(record, "region")),
         LeadContactNormalizer.blank(value(record, "notes")), LeadStatus.NEW.value(), ownerId, job.createdById(),
-        parseInstant(value(record, "nextFollowUpAt")));
+        JdbcTimeUtils.toDbTime(parseInstant(value(record, "nextFollowUpAt"))));
   }
 
   private UUID parseOwner(UUID organizationId, String value) {

@@ -1,6 +1,7 @@
 package com.minicrm.leads;
 
 import com.minicrm.common.ApiException;
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.SecurityUser;
@@ -80,11 +81,11 @@ public class ExportService {
     }
     if (from != null && !from.isBlank()) {
       where.append(" AND l.created_at >= ?::timestamptz ");
-      args.add(parseInstant(from, "from"));
+      args.add(JdbcTimeUtils.toDbTime(parseInstant(from, "from")));
     }
     if (to != null && !to.isBlank()) {
       where.append(" AND l.created_at <= ?::timestamptz ");
-      args.add(parseInstant(to, "to"));
+      args.add(JdbcTimeUtils.toDbTime(parseInstant(to, "to")));
     }
     Long count = jdbc.queryForObject("SELECT COUNT(*) FROM leads l" + where, Long.class, args.toArray());
     if (count != null && count > MAX_ROWS) {
@@ -118,7 +119,8 @@ public class ExportService {
           printer.printRecord(escapeCell(rs.getObject("id")), escapeCell(rs.getString("name")),
               escapeCell(rs.getString("company")), escapeCell(rs.getString("phone")), escapeCell(rs.getString("email")),
               escapeCell(rs.getString("source")), escapeCell(rs.getString("status")), escapeCell(rs.getObject("owner_id")),
-              escapeCell(rs.getObject("created_at")), escapeCell(rs.getObject("updated_at")));
+              escapeCell(JdbcTimeUtils.fromDbTime(rs, "created_at")),
+              escapeCell(JdbcTimeUtils.fromDbTime(rs, "updated_at")));
         } catch (IOException exception) {
           throw new ExportIOException(exception);
         }

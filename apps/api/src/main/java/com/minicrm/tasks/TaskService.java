@@ -4,6 +4,7 @@ import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.ActivityLogEvents;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.PageSupport;
 import com.minicrm.common.SecurityUser;
 import com.minicrm.common.TaskStatus;
@@ -45,8 +46,8 @@ public class TaskService {
       if ("overdue".equals(query.status())) where.append(" AND t.status = 'pending'::task_status AND t.due_at < now() ");
       else { try { TaskStatus.valueOf(query.status()); } catch (IllegalArgumentException e) { throw new ApiException("VALIDATION_FAILED", "任务状态无效", HttpStatus.BAD_REQUEST); } where.append(" AND t.status = ?::task_status "); args.add(query.status()); }
     }
-    if (query.dueFrom() != null) { where.append(" AND t.due_at >= ? "); args.add(query.dueFrom()); }
-    if (query.dueTo() != null) { where.append(" AND t.due_at <= ? "); args.add(query.dueTo()); }
+    if (query.dueFrom() != null) { where.append(" AND t.due_at >= ? "); args.add(JdbcTimeUtils.toDbTime(parseDateTime(query.dueFrom(), "dueFrom"))); }
+    if (query.dueTo() != null) { where.append(" AND t.due_at <= ? "); args.add(JdbcTimeUtils.toDbTime(parseDateTime(query.dueTo(), "dueTo"))); }
     if (query.assigneeId() != null) { where.append(" AND t.assignee_id = ? "); args.add(query.assigneeId()); }
     if (query.leadId() != null) { where.append(" AND t.lead_id = ? "); args.add(query.leadId()); }
     Long total = jdbc.queryForObject("SELECT COUNT(*) FROM tasks t" + where, Long.class, args.toArray());
@@ -76,7 +77,7 @@ public class TaskService {
     if (!"pending".equals(task.get("status"))) throw new ApiException("TASK_TERMINAL_STATE", "已完成或已取消任务不可修改", HttpStatus.CONFLICT);
     if (!BusinessRules.isAdmin(actor) && request.assigneeId() != null && !actor.id().equals(request.assigneeId())) throw forbidden();
     if (request.assigneeId() != null) ensureUser(request.assigneeId(), actor.organizationId());
-    jdbc.update("UPDATE tasks SET title = COALESCE(?, title), due_at = COALESCE(?, due_at), assignee_id = COALESCE(?, assignee_id), updated_at = now() WHERE id = ? AND organization_id = ?", blank(request.title()), request.dueAt(), request.assigneeId(), id, actor.organizationId());
+    jdbc.update("UPDATE tasks SET title = COALESCE(?, title), due_at = COALESCE(?, due_at), assignee_id = COALESCE(?, assignee_id), updated_at = now() WHERE id = ? AND organization_id = ?", blank(request.title()), JdbcTimeUtils.toDbTime(request.dueAt()), request.assigneeId(), id, actor.organizationId());
     activityLogService.record(actor, ActivityLogEvents.UPDATE_TASK, "TASK", id, null, httpRequest);
     return get(actor, id);
   }
@@ -100,8 +101,15 @@ public class TaskService {
     Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id = ? AND organization_id = ?", Integer.class, id, organizationId);
     if (count == null || count != 1) throw new ApiException("RESOURCE_NOT_FOUND", "用户不存在", HttpStatus.NOT_FOUND);
   }
-  private Map<String, Object> task(ResultSet rs) throws SQLException { Map<String, Object> result = new LinkedHashMap<>(); result.put("id", rs.getObject("id")); result.put("leadId", rs.getObject("lead_id")); result.put("leadName", rs.getString("lead_name")); result.put("title", rs.getString("title")); result.put("dueAt", rs.getObject("due_at")); result.put("status", rs.getString("status")); result.put("isOverdue", "pending".equals(rs.getString("status")) && rs.getTimestamp("due_at").toInstant().isBefore(Instant.now())); result.put("assigneeId", rs.getObject("assignee_id")); result.put("assignee", Map.of("id", rs.getObject("assignee_id"), "name", rs.getString("assignee_name"))); result.put("resolutionNote", rs.getString("resolution_note")); result.put("completedAt", rs.getObject("completed_at")); result.put("cancelledAt", rs.getObject("cancelled_at")); result.put("createdAt", rs.getObject("created_at")); return result; }
+  private Map<String, Object> task(ResultSet rs) throws SQLException { Map<String, Object> result = new LinkedHashMap<>(); result.put("id", rs.getObject("id")); result.put("leadId", rs.getObject("lead_id")); result.put("leadName", rs.getString("lead_name")); result.put("title", rs.getString("title")); Instant dueAt = JdbcTimeUtils.fromDbTime(rs, "due_at"); result.put("dueAt", dueAt); result.put("status", rs.getString("status")); result.put("isOverdue", "pending".equals(rs.getString("status")) && dueAt != null && dueAt.isBefore(Instant.now())); result.put("assigneeId", rs.getObject("assignee_id")); result.put("assignee", Map.of("id", rs.getObject("assignee_id"), "name", rs.getString("assignee_name"))); result.put("resolutionNote", rs.getString("resolution_note")); result.put("completedAt", JdbcTimeUtils.fromDbTime(rs, "completed_at")); result.put("cancelledAt", JdbcTimeUtils.fromDbTime(rs, "cancelled_at")); result.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at")); return result; }
   private String blank(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+  private Instant parseDateTime(String value, String field) {
+    try {
+      return Instant.parse(value);
+    } catch (RuntimeException exception) {
+      throw new ApiException("VALIDATION_FAILED", field + " 日期格式无效", HttpStatus.BAD_REQUEST);
+    }
+  }
   private ApiException notFound() { return new ApiException("RESOURCE_NOT_FOUND", "任务不存在", HttpStatus.NOT_FOUND); }
   private ApiException forbidden() { return new ApiException("FORBIDDEN", "当前用户没有执行此操作的权限", HttpStatus.FORBIDDEN); }
   private boolean canMutate(SecurityUser actor, UUID assigneeId) {

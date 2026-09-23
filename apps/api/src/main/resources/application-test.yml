@@ -1,0 +1,11 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+app:
+  import:
+    enabled: false
+  scheduler:
+    task-reminder:
+      enabled: false

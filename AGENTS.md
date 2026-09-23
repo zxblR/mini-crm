@@ -81,6 +81,8 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 - UUID、可空性、长度、默认值、唯一约束、外键和枚举值必须与 schema 一一对应。Java 枚举的持久化值必须与 PostgreSQL/接口契约的字面值一致，不得只依赖 Java 常量名。
 - `organization_id` 是组织隔离的必要条件。所有读写、关联和批量操作都必须在 SQL 或 Service 层校验组织归属，不能信任客户端传入的组织 ID。
 - `timestamptz` 对应 Java `Instant`，API 使用 UTC ISO 8601；前端仅在展示层转换用户时区。
+- JdbcTemplate 向 PostgreSQL 绑定时间参数时，不得直接传 `Instant`。统一通过 `JdbcTimeUtils.toDbTime(Instant)` 转成 UTC `OffsetDateTime` 后传参；读取 `timestamptz` 使用 `JdbcTimeUtils.fromDbTime(ResultSet, column)` 转回 `Instant`，保留空值语义。禁止依赖驱动对 `Instant` 的隐式 SQL 类型推断。
+- 任何 `INSERT` 必须显式写入表中存在的 `created_at`/`updated_at` 时间列，不依赖数据库默认值，保证测试库、生产库和不同迁移状态下行为一致。仅有 `created_at` 或无时间列的表按实际 schema 执行。Mock `JdbcTemplate` 无法捕获 NOT NULL、唯一约束或外键错误；涉及写库的关键路径至少要在真实 PostgreSQL 上手动验证一次。
 - 本项目不启用 Hibernate/JPA 自动建表或 `ddl-auto`。若未来新增 Java Entity，只能作为明确的读写映射模型，必须逐字段核对 Prisma schema，并由 migration 管理数据库结构。
 - 结构整理不改变表、字段、索引、枚举或约束；需要变更时必须同时更新 schema、migration、Java 映射、API 契约和测试。
 

@@ -1,5 +1,6 @@
 package com.minicrm.jobs;
 
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
@@ -128,8 +129,8 @@ public class ImportJobService {
     result.put("succeeded", rs.getInt("succeeded"));
     result.put("failed", rs.getInt("failed"));
     result.put("errorFileUrl", rs.getString("error_file_url"));
-    result.put("createdAt", rs.getObject("created_at"));
-    result.put("finishedAt", rs.getObject("finished_at"));
+    result.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at"));
+    result.put("finishedAt", JdbcTimeUtils.fromDbTime(rs, "finished_at"));
     return result;
   }
 }

@@ -5,6 +5,7 @@ import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.FollowUpType;
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.PageSupport;
 import com.minicrm.common.SecurityUser;
 import com.minicrm.leads.LeadService;
@@ -49,8 +50,8 @@ public class FollowUpService {
     args.add(actor.organizationId());
     args.add(lead.get("id"));
     if (query.type() != null) args.add(query.type().name());
-    if (query.from() != null) args.add(query.from());
-    if (query.to() != null) args.add(query.to());
+    if (query.from() != null) args.add(JdbcTimeUtils.toDbTime(parseDateTime(query.from(), "from")));
+    if (query.to() != null) args.add(JdbcTimeUtils.toDbTime(parseDateTime(query.to(), "to")));
     String where = " WHERE f.organization_id = ? AND f.lead_id = ? AND f.deleted_at IS NULL"
         + typeClause + fromClause + toClause;
     Long total = jdbc.queryForObject("SELECT COUNT(*) FROM follow_ups f" + where, Long.class, args.toArray());
@@ -86,10 +87,10 @@ public class FollowUpService {
     BusinessRules.requireLeadOwnerOrAdmin(actor, (UUID) lead.get("ownerId"));
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO follow_ups (id, organization_id, lead_id, created_by_id, type, occurred_at, summary, result, next_step_at) "
-            + "VALUES (?, ?, ?, ?, ?::follow_up_type, ?, ?, ?, ?)",
-        id, actor.organizationId(), leadId, actor.id(), request.type().name(), request.occurredAt(),
-        request.summary().trim(), blank(request.result()), request.nextStepAt());
+        "INSERT INTO follow_ups (id, organization_id, lead_id, created_by_id, type, occurred_at, summary, result, next_step_at, created_at, updated_at) "
+            + "VALUES (?, ?, ?, ?, ?::follow_up_type, ?, ?, ?, ?, now(), now())",
+        id, actor.organizationId(), leadId, actor.id(), request.type().name(), JdbcTimeUtils.toDbTime(request.occurredAt()),
+        request.summary().trim(), blank(request.result()), JdbcTimeUtils.toDbTime(request.nextStepAt()));
     ensureAutoTask(actor, leadId, id, lead, request.summary(), request.nextStepAt(), httpRequest);
     recalculateNextFollowUpAt(actor.organizationId(), leadId);
     activityLogService.record(actor, ActivityLogEvents.CREATE_FOLLOW_UP, "FOLLOW_UP", id, null, httpRequest);
@@ -115,8 +116,8 @@ public class FollowUpService {
         "UPDATE follow_ups SET type = COALESCE(?::follow_up_type, type), occurred_at = COALESCE(?, occurred_at), "
             + "summary = COALESCE(?, summary), result = COALESCE(?, result), next_step_at = COALESCE(?, next_step_at), "
             + "updated_at = now() WHERE id = ? AND organization_id = ? AND deleted_at IS NULL",
-        request.type() == null ? null : request.type().name(), request.occurredAt(), blank(request.summary()),
-        blank(request.result()), request.nextStepAt(), id, actor.organizationId());
+        request.type() == null ? null : request.type().name(), JdbcTimeUtils.toDbTime(request.occurredAt()), blank(request.summary()),
+        blank(request.result()), JdbcTimeUtils.toDbTime(request.nextStepAt()), id, actor.organizationId());
     String title = request.summary() == null ? String.valueOf(current.get("summary")) : request.summary().trim();
     Instant nextStepAt = request.nextStepAt() == null ? toInstant(current.get("nextStepAt")) : request.nextStepAt();
     ensureAutoTask(actor, leadId, id, lead, title, nextStepAt, httpRequest);
@@ -156,19 +157,24 @@ public class FollowUpService {
     }
     String title = summary == null || summary.isBlank() ? "跟进任务" : summary.trim();
     UUID candidateId = UUID.randomUUID();
-    int inserted = jdbc.update("INSERT INTO tasks (id, organization_id, lead_id, follow_up_id, assignee_id, created_by_id, title, due_at) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (follow_up_id) DO NOTHING", candidateId,
-        actor.organizationId(), leadId, followUpId, ownerId, actor.id(), title, dueAt);
+    int inserted = jdbc.update("INSERT INTO tasks (id, organization_id, lead_id, follow_up_id, assignee_id, created_by_id, title, due_at, created_at, updated_at) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now()) ON CONFLICT (follow_up_id) DO NOTHING", candidateId,
+        actor.organizationId(), leadId, followUpId, ownerId, actor.id(), title, JdbcTimeUtils.toDbTime(dueAt));
     if (inserted == 1) {
       activityLogService.record(actor, ActivityLogEvents.CREATE_TASK, "TASK", candidateId,
           Map.of("leadId", leadId, "followUpId", followUpId), request);
     } else {
       UUID taskId = jdbc.query("SELECT id FROM tasks WHERE follow_up_id = ? AND organization_id = ?",
-          rs -> rs.next() ? rs.getObject("id", UUID.class) : null, followUpId, actor.organizationId());
+          rs -> {
+            if (!rs.next()) return null;
+            Object value = rs.getObject("id");
+            if (value instanceof UUID uuid) return uuid;
+            return value == null ? null : UUID.fromString(value.toString());
+          }, followUpId, actor.organizationId());
       if (taskId == null) return;
       jdbc.update("UPDATE tasks SET due_at = ?, title = ?, assignee_id = ?, updated_at = now() "
               + "WHERE id = ? AND organization_id = ? AND status = 'pending'::task_status",
-          dueAt, title, ownerId, taskId, actor.organizationId());
+          JdbcTimeUtils.toDbTime(dueAt), title, ownerId, taskId, actor.organizationId());
       activityLogService.record(actor, ActivityLogEvents.UPDATE_TASK, "TASK", taskId,
           Map.of("leadId", leadId, "followUpId", followUpId), request);
     }
@@ -186,33 +192,40 @@ public class FollowUpService {
 
   private void recalculateNextFollowUpAt(UUID organizationId, UUID leadId) {
     Instant next = jdbc.queryForObject(
-        "SELECT MIN(next_step_at) FROM follow_ups WHERE organization_id = ? AND lead_id = ? "
+        "SELECT MIN(next_step_at) AS next_follow_up_at FROM follow_ups WHERE organization_id = ? AND lead_id = ? "
             + "AND deleted_at IS NULL AND next_step_at IS NOT NULL",
-        (rs, rowNum) -> rs.getTimestamp(1) == null ? null : rs.getTimestamp(1).toInstant(),
+        (rs, rowNum) -> JdbcTimeUtils.fromDbTime(rs, "next_follow_up_at"),
         organizationId, leadId);
     jdbc.update("UPDATE leads SET next_follow_up_at = ?, updated_at = now() WHERE id = ? AND organization_id = ?",
-        next, leadId, organizationId);
+        JdbcTimeUtils.toDbTime(next), leadId, organizationId);
   }
 
   private Map<String, Object> row(ResultSet rs) throws SQLException {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("id", rs.getObject("id")); result.put("leadId", rs.getObject("lead_id"));
     result.put("createdById", rs.getObject("created_by_id")); result.put("type", rs.getString("type"));
-    result.put("occurredAt", rs.getObject("occurred_at")); result.put("summary", rs.getString("summary"));
-    result.put("result", rs.getString("result")); result.put("nextStepAt", rs.getObject("next_step_at"));
+    result.put("occurredAt", JdbcTimeUtils.fromDbTime(rs, "occurred_at")); result.put("summary", rs.getString("summary"));
+    result.put("result", rs.getString("result")); result.put("nextStepAt", JdbcTimeUtils.fromDbTime(rs, "next_step_at"));
     result.put("createdBy", Map.of("id", rs.getObject("user_id"), "name", rs.getString("user_name")));
-    result.put("createdAt", rs.getObject("created_at")); result.put("updatedAt", rs.getObject("updated_at"));
+    result.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at")); result.put("updatedAt", JdbcTimeUtils.fromDbTime(rs, "updated_at"));
     return result;
   }
 
   private Map<String, Object> deletedRow(ResultSet rs) throws SQLException {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("id", rs.getObject("id")); result.put("leadId", rs.getObject("lead_id"));
-    result.put("createdById", rs.getObject("created_by_id")); result.put("deletedAt", rs.getObject("deleted_at"));
+    result.put("createdById", rs.getObject("created_by_id")); result.put("deletedAt", JdbcTimeUtils.fromDbTime(rs, "deleted_at"));
     return result;
   }
 
   private String blank(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+  private Instant parseDateTime(String value, String field) {
+    try {
+      return Instant.parse(value);
+    } catch (RuntimeException exception) {
+      throw new ApiException("VALIDATION_FAILED", field + " 日期格式无效", HttpStatus.BAD_REQUEST);
+    }
+  }
   private Instant toInstant(Object value) {
     if (value == null) return null;
     if (value instanceof Instant instant) return instant;

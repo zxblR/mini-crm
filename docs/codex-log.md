@@ -147,3 +147,34 @@
 - Timeline：阶段历史、跟进、任务操作日志统一使用 `UNION ALL`，按 `occurred_at DESC, created_at DESC, id DESC` 排序并使用 `LIMIT/OFFSET`；软删除跟进保留并标记 `deleted: true`，普通 FollowUp 列表继续过滤软删除。
 - 调度：新增 `TaskReminderScheduler`，默认关闭，生产通过 `app.scheduler.task-reminder.*` 显式开启；扫描使用 `FOR UPDATE SKIP LOCKED`，仅领取 pending 且尚未提醒的超时任务。
 - 验收：本次未在 Codex 中运行 Maven、pnpm、Python、Docker 或数据库命令；需由人工执行下方验收命令并记录结果。
+
+## 2026-09-22：阶段 4 验收补测与接口偏差固化
+
+- 接口契约：确认 FollowUp 创建/列表使用嵌套路由，Task 完成使用 `POST /tasks/{id}/complete`，Timeline 合并在 `GET /leads/{id}` 的 `timelinePage/timelinePageSize` 查询参数中。
+- 测试：新增 FollowUp 自动任务幂等、软删除重算、负责人无效跳过日志、Timeline SQL 聚合契约、Task 权限/终态和 Task 操作日志测试。
+- ImportJobWorker：增加 `app.import.enabled` 条件，默认开启；测试 profile 关闭，避免 Spring 测试上下文后台轮询真实数据库。
+
+## 2026-09-22：阶段 4 验收修复
+
+- 修复 FollowUp 自动任务查询的 UUID 映射，兼容 JDBC 返回的 UUID 或字符串值。
+- 修正 FollowUpService 测试中的 JdbcTemplate 泛型 stub，避免将 FollowUp `LinkedHashMap` 错当作 Task UUID。
+- 清理该测试的 raw Mockito matcher，消除 unchecked 警告。
+
+## 2026-09-23：JDBC timestamptz 参数映射修复
+
+- 原因：PostgreSQL JDBC 驱动无法为直接绑定的 `java.time.Instant` 推断 SQL 类型，可能令 FollowUp 创建返回 500。
+- 修复：新增 `JdbcTimeUtils`，所有本轮扫描到的 `Instant` SQL 参数统一转成 UTC `OffsetDateTime`；所有 API 结果映射中的 `timestamptz` 列显式读取为 `OffsetDateTime` 并还原 `Instant`，保留 `NULL`。
+- 覆盖：FollowUp 创建/更新/自动任务、Lead 创建/更新、导入、导出日期过滤、Task 更新及 nextFollowUpAt 重算；新增 UTC 转换与读取测试，并在 FollowUp JDBC 参数测试中断言实际绑定类型。
+- 验收：遵循仓库人工验收规则，本轮未运行构建或测试；待人工执行 `mvn -f apps/api/pom.xml test`。
+
+## 2026-09-23：阶段 4 测试断言修复
+
+- 修复 FollowUpService 更新参数类型测试中 Lead 重算时间的期望值。测试的 nextFollowUpAt RowMapper stub 固定返回 `2026-09-30T00:00:00Z`，因此 Lead UPDATE 参数应与该 stub 返回值一致；FollowUp 和自动 Task 更新参数仍断言请求时间 `2026-10-01T09:30:00Z`。
+- 静态确认 SQL 子串和参数下标分别指向 FollowUp UPDATE、Task INSERT、Lead UPDATE；未改生产代码。测试待人工重新运行。
+
+## 2026-09-23：阶段 4 FollowUp INSERT 约束修复
+
+- 真实 PostgreSQL 验证发现 `follow_ups.updated_at` 为 NOT NULL 且无默认值，FollowUp 创建 INSERT 未写入该列，导致 `POST /api/v1/leads/{leadId}/follow-ups` 返回 500。
+- 修复：FollowUp INSERT 显式写入 `created_at`、`updated_at`；自动 Task INSERT 以及 Lead 创建/导入 INSERT 同步显式写入两列，避免依赖数据库默认值。
+- 扫描结论：确认遗漏为 FollowUp INSERT 的 `updated_at`（并按约定补齐相关已存在时间列）；activity_logs、lead_tags、stage_history 等表按其实际 schema 的时间列处理，未修改 migration 或阶段 3 业务逻辑。
+- 重要性：Mock JdbcTemplate 无法模拟 NOT NULL、唯一约束和外键错误；FollowUp、Task、Lead、Import 等写库关键路径必须在真实 PostgreSQL 上至少手动验收一次。

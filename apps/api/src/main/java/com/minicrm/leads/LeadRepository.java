@@ -3,6 +3,7 @@ package com.minicrm.leads;
 import com.minicrm.common.PageSupport;
 import com.minicrm.common.SecurityUser;
 import com.minicrm.common.ActivityLogEvents;
+import com.minicrm.common.JdbcTimeUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -52,11 +53,11 @@ public class LeadRepository {
     }
     if (query.from() != null && !query.from().isBlank()) {
       where.append(" AND l.created_at >= ?::timestamptz ");
-      args.add(query.from());
+      args.add(JdbcTimeUtils.toDbTime(Instant.parse(query.from())));
     }
     if (query.to() != null && !query.to().isBlank()) {
       where.append(" AND l.created_at <= ?::timestamptz ");
-      args.add(query.to());
+      args.add(JdbcTimeUtils.toDbTime(Instant.parse(query.to())));
     }
     where.append(Boolean.TRUE.equals(query.archived())
         ? " AND l.archived_at IS NOT NULL "
@@ -162,14 +163,14 @@ public class LeadRepository {
     jdbc.update("""
         INSERT INTO leads (id, organization_id, name, company, phone, normalized_phone,
           email, normalized_email, source, industry, region, notes, status, owner_id,
-          created_by_id, next_follow_up_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::lead_status, ?, ?, ?, now())
+          created_by_id, next_follow_up_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::lead_status, ?, ?, ?, now(), now())
         """, id, organizationId, LeadContactNormalizer.blank(request.name()),
         LeadContactNormalizer.blank(request.company()), LeadContactNormalizer.blank(request.phone()), phone,
         LeadContactNormalizer.blank(request.email()), email, request.source().trim(),
         LeadContactNormalizer.blank(request.industry()), LeadContactNormalizer.blank(request.region()),
         LeadContactNormalizer.blank(request.notes()), status.value(), ownerId, actorId,
-        request.nextFollowUpAt());
+        JdbcTimeUtils.toDbTime(request.nextFollowUpAt()));
     return id;
   }
 
@@ -188,7 +189,7 @@ public class LeadRepository {
         LeadContactNormalizer.blank(request.phone()), phone, LeadContactNormalizer.blank(request.email()), email,
         LeadContactNormalizer.blank(request.source()), LeadContactNormalizer.blank(request.industry()),
         LeadContactNormalizer.blank(request.region()), LeadContactNormalizer.blank(request.notes()), ownerId,
-        request.nextFollowUpAt(), id, organizationId);
+        JdbcTimeUtils.toDbTime(request.nextFollowUpAt()), id, organizationId);
   }
 
   public void archive(UUID organizationId, UUID id, boolean restore) {
@@ -306,10 +307,10 @@ public class LeadRepository {
     value.put("email", rs.getString("email")); value.put("source", rs.getString("source"));
     value.put("industry", rs.getString("industry")); value.put("region", rs.getString("region"));
     value.put("ownerId", rs.getObject("owner_id")); value.put("owner", owner(rs));
-    value.put("status", rs.getString("status")); value.put("nextFollowUpAt", rs.getObject("next_follow_up_at"));
-    value.put("archivedAt", rs.getObject("archived_at")); value.put("closedAt", rs.getObject("closed_at"));
+    value.put("status", rs.getString("status")); value.put("nextFollowUpAt", JdbcTimeUtils.fromDbTime(rs, "next_follow_up_at"));
+    value.put("archivedAt", JdbcTimeUtils.fromDbTime(rs, "archived_at")); value.put("closedAt", JdbcTimeUtils.fromDbTime(rs, "closed_at"));
     value.put("outcomeNote", rs.getString("outcome_note")); value.put("lostReason", rs.getString("lost_reason"));
-    value.put("createdAt", rs.getObject("created_at")); value.put("updatedAt", rs.getObject("updated_at"));
+    value.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at")); value.put("updatedAt", JdbcTimeUtils.fromDbTime(rs, "updated_at"));
     return value;
   }
 
@@ -325,12 +326,12 @@ public class LeadRepository {
   private Map<String, Object> locked(ResultSet rs) throws SQLException {
     Map<String, Object> value = new LinkedHashMap<>();
     value.put("id", rs.getObject("id")); value.put("ownerId", rs.getObject("owner_id"));
-    value.put("status", LeadStatus.fromValue(rs.getString("status"))); value.put("archivedAt", rs.getObject("archived_at"));
+    value.put("status", LeadStatus.fromValue(rs.getString("status"))); value.put("archivedAt", JdbcTimeUtils.fromDbTime(rs, "archived_at"));
     value.put("name", rs.getString("name")); value.put("company", rs.getString("company"));
     value.put("phone", rs.getString("phone")); value.put("email", rs.getString("email"));
     value.put("source", rs.getString("source")); value.put("industry", rs.getString("industry"));
     value.put("region", rs.getString("region")); value.put("notes", rs.getString("notes"));
-    value.put("nextFollowUpAt", rs.getObject("next_follow_up_at")); value.put("closedAt", rs.getObject("closed_at"));
+    value.put("nextFollowUpAt", JdbcTimeUtils.fromDbTime(rs, "next_follow_up_at")); value.put("closedAt", JdbcTimeUtils.fromDbTime(rs, "closed_at"));
     value.put("outcomeNote", rs.getString("outcome_note")); value.put("lostReason", rs.getString("lost_reason"));
     return value;
   }
@@ -346,7 +347,7 @@ public class LeadRepository {
     Map<String, Object> value = new LinkedHashMap<>(); value.put("id", rs.getObject("id"));
     value.put("type", rs.getString("type")); value.put("title", rs.getString("title"));
     value.put("description", rs.getString("description")); value.put("actorName", rs.getString("actor_name"));
-    value.put("occurredAt", rs.getObject("occurred_at"));
+    value.put("occurredAt", JdbcTimeUtils.fromDbTime(rs, "occurred_at"));
     value.put("deleted", rs.getBoolean("deleted"));
     Object metadata = rs.getObject("metadata");
     if (metadata != null) value.put("metadata", metadata);
