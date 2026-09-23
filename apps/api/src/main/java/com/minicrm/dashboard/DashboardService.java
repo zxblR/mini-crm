@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,18 +45,20 @@ public class DashboardService {
     List<Object> leadArgs = leadArgs(actor, filter);
 
     Long total = jdbc.queryForObject(
-        "SELECT COUNT(*) FROM leads l JOIN pipeline_stages s ON s.id = l.stage_id "
+        "SELECT COUNT(*) FROM leads l "
             + "WHERE l.organization_id = ? AND l.archived_at IS NULL" + leadWhere,
         Long.class,
         leadArgs.toArray());
     Long won = jdbc.queryForObject(
-        "SELECT COUNT(*) FROM leads l JOIN pipeline_stages s ON s.id = l.stage_id "
-            + "WHERE l.organization_id = ? AND l.archived_at IS NULL AND s.is_won = true" + leadWhere,
+        "SELECT COUNT(*) FROM leads l "
+            + "WHERE l.organization_id = ? AND l.archived_at IS NULL "
+            + "AND l.status = 'won'::lead_status AND l.closed_at IS NOT NULL" + leadWhere,
         Long.class,
         leadArgs.toArray());
     Long lost = jdbc.queryForObject(
-        "SELECT COUNT(*) FROM leads l JOIN pipeline_stages s ON s.id = l.stage_id "
-            + "WHERE l.organization_id = ? AND l.archived_at IS NULL AND s.is_lost = true" + leadWhere,
+        "SELECT COUNT(*) FROM leads l "
+            + "WHERE l.organization_id = ? AND l.archived_at IS NULL "
+            + "AND l.status = 'lost'::lead_status AND l.closed_at IS NOT NULL" + leadWhere,
         Long.class,
         leadArgs.toArray());
     Long overdue = jdbc.queryForObject(
@@ -147,8 +150,8 @@ public class DashboardService {
     listArgs.add(paging.pageSize());
     listArgs.add(paging.offset());
     List<Map<String, Object>> items = jdbc.query(
-        "SELECT l.source, COUNT(*) AS count, COUNT(*) FILTER (WHERE s.is_won) AS won "
-            + "FROM leads l JOIN pipeline_stages s ON s.id = l.stage_id "
+        "SELECT l.source, COUNT(*) AS count, COUNT(*) FILTER (WHERE l.status = 'won'::lead_status AND l.closed_at IS NOT NULL) AS won "
+            + "FROM leads l "
             + "WHERE l.organization_id = ? AND l.archived_at IS NULL" + where
             + " GROUP BY l.source ORDER BY count DESC LIMIT ? OFFSET ?",
         (rs, row) -> {
@@ -183,12 +186,11 @@ public class DashboardService {
     listArgs.add(paging.offset());
     List<Map<String, Object>> items = jdbc.query(
         "SELECT l.owner_id, u.name AS owner_name, COUNT(*) AS total, "
-            + "COUNT(*) FILTER (WHERE s.is_won) AS won, "
+            + "COUNT(*) FILTER (WHERE l.status = 'won'::lead_status AND l.closed_at IS NOT NULL) AS won, "
             + "(SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = l.owner_id "
             + "AND t.organization_id = l.organization_id "
             + "AND t.status = 'pending'::task_status AND t.due_at < now()) AS overdue_tasks "
             + "FROM leads l LEFT JOIN users u ON u.id = l.owner_id "
-            + "JOIN pipeline_stages s ON s.id = l.stage_id "
             + "WHERE l.organization_id = ? AND l.archived_at IS NULL" + where
             + " GROUP BY l.owner_id, u.name, l.organization_id "
             + "ORDER BY total DESC LIMIT ? OFFSET ?",
@@ -286,8 +288,8 @@ public class DashboardService {
     args.add(actor.organizationId());
     if (filter.ownerId() != null) args.add(filter.ownerId());
     if (filter.source() != null && !filter.source().isBlank()) args.add(filter.source());
-    if (filter.from() != null) args.add(filter.from());
-    if (filter.to() != null) args.add(filter.to());
+    if (filter.from() != null) args.add(dbTime(filter.from()));
+    if (filter.to() != null) args.add(dbTime(filter.to()));
     return args;
   }
 
@@ -332,8 +334,8 @@ public class DashboardService {
   private List<Object> activityArgs(SecurityUser actor, Filter filter) {
     List<Object> args = new ArrayList<>();
     args.add(actor.organizationId());
-    if (filter.from() != null) args.add(filter.from());
-    if (filter.to() != null) args.add(filter.to());
+    if (filter.from() != null) args.add(dbTime(filter.from()));
+    if (filter.to() != null) args.add(dbTime(filter.to()));
     if (filter.ownerId() != null) {
       args.add(filter.ownerId());
       args.add(filter.ownerId());
@@ -356,5 +358,9 @@ public class DashboardService {
     }
   }
 
-  public record Filter(String from, String to, UUID ownerId, String source) {}
+  private OffsetDateTime dbTime(OffsetDateTime value) {
+    return JdbcTimeUtils.toDbTime(value.toInstant());
+  }
+
+  public record Filter(OffsetDateTime from, OffsetDateTime to, UUID ownerId, String source) {}
 }

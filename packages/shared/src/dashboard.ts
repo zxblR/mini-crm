@@ -53,3 +53,54 @@ export interface ActivityItem {
 }
 
 export type DashboardListQuery = DashboardFilter & PageQuery;
+
+export enum Granularity {
+  Day = 'day',
+  Week = 'week',
+  Month = 'month',
+}
+
+export interface StatsOverviewDTO {
+  totalLeads: number;
+  newLeads: number;
+  statusCounts: Array<{ status: string; count: number }>;
+  conversionRate: number;
+  avgDealCycleSeconds: number | null;
+  respondedCount: number;
+  unrespondedCount: number;
+  avgResponseSeconds: number | null;
+}
+
+export interface ChannelStatsDTO {
+  source: string;
+  leadCount: number;
+  wonCount: number;
+  conversionRate: number;
+}
+
+export interface SalesRankingDTO {
+  ownerId: string;
+  ownerName: string;
+  followUpCount: number;
+  wonCount: number;
+  avgDealCycleSeconds: number | null;
+  conversionRate: number;
+}
+
+export interface TrendPointDTO {
+  periodStart: string;
+  leadCount: number;
+  wonCount: number;
+}
+
+export interface ResponseTimeStatsDTO {
+  respondedCount: number;
+  unrespondedCount: number;
+  avgResponseSeconds: number | null;
+  buckets: Array<{ name: '<1h' | '1h-24h' | '1d-7d' | '>7d' | 'unresponded'; count: number }>;
+}
+
+export interface LossReasonStatsDTO {
+  lostReason: string;
+  count: number;
+}
