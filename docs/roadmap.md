@@ -32,11 +32,11 @@
 
 验收：`cd apps/api; mvn test`; `pnpm --filter web test`; `pnpm test:e2e -- leads`; 手工验证分页最大 `pageSize=100` 和跨组织资源返回 `404`。
 
-## 阶段 5：阶段看板与跟进时间线
+## 阶段 5：统计报表（本次）
 
-目标：阶段配置、阶段变更历史、拖拽/按钮推进、跟进记录和详情时间线；赢单/输单规则完整。
+目标：扩展现有 `/api/v1/dashboard/*` 数量统计，提供总览、渠道、销售排名、趋势、流失原因和响应时长代理指标；统一 UTC 统计与组织/个人数据范围。不做金额、成本、ROI、AI 或前端页面。
 
-验收：`cd apps/api; mvn test`; `pnpm test:e2e -- pipeline`; `pnpm --filter web build`；验证输单无原因不能提交。
+验收：`mvn -f apps/api/pom.xml test`；MockMvc 验证 401/403/404/正常流；使用独立 `mini_crm_test` 真实 PostgreSQL 验证聚合与时间类型；合成数据执行 `EXPLAIN (ANALYZE, BUFFERS)`，仅在核心表出现有实质影响的 Seq Scan 时考虑新增索引 migration。
 
 ## 阶段 6：任务、提醒与 BullMQ
 
@@ -44,11 +44,11 @@
 
 验收：`docker compose up -d postgres redis`; `cd apps/api; mvn test`; `pnpm test:e2e -- tasks`；验证 Java 队列消费者日志。
 
-## 阶段 7：仪表盘与 ECharts
+## 阶段 7：仪表盘与 ECharts（历史编号，已并入阶段 5）
 
-目标：摘要、漏斗、来源、负责人排行和逾期指标 API；前端用 ECharts 展示筛选后的数据和加载/空态/错误态。
+历史说明：原阶段 7 规划的摘要、漏斗、来源、负责人排行和 ECharts 仪表盘已随阶段 3/4 及阶段 5 统计报表规划合并；本阶段编号保留用于追溯，不再作为独立交付阶段。本次阶段 5 不实现前端页面。
 
-验收：`cd apps/api; mvn test`; `pnpm --filter web test -- dashboard`; `pnpm test:e2e -- dashboard`; `pnpm --filter web build`。
+验收：无独立验收项，按阶段 5 的 API 和 PostgreSQL 报表验收执行。
 
 ## 阶段 8：导入、审计与可运维性
 
@@ -89,3 +89,11 @@
 - ImportJobWorker 测试期间连真实数据库的噪音，需测试 profile 关闭
 
 - timeline cursor 分页（当前 offset）
+
+## 阶段 3.5 pipeline backlog
+
+- 原阶段 5 的阶段看板：恢复 pipeline stage 配置运行时 API、阶段变更交互及前端看板。该工作不属于本次阶段 5 报表范围。
+
+## 阶段编号历史说明
+
+本路线图早期的阶段 5 指“阶段看板与跟进时间线”，早期阶段 7 指“仪表盘与 ECharts”。按 ADR 0002，原阶段 5 调整至阶段 3.5 pipeline backlog，原阶段 7 仪表盘统计并入当前阶段 5；此历史说明保留以避免旧计划编号失去上下文。

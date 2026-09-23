@@ -1,6 +1,43 @@
 # Mini CRM ER Diagram
 
-以下模型以单组织 MVP 为基线。租户业务实体使用 UUID 主键、与生命周期相符的时间字段（`created_at`、`updated_at` 或事件时间，必要时 `deleted_at`），并直接保存 `organization_id`；全局角色字典 `ROLES` 除外，关联表通过复合外键保证组织一致。字段名为数据库 `snake_case`，Java 使用 JDBC Repository 访问。
+当前数据库表、列、枚举、约束和关系以 `prisma/schema.prisma` 及不可变 migration 为唯一事实来源。以下统计关系子图已按 schema 对齐；后面的早期全量 ER 草图保留作历史上下文，不得用于实现 SQL。已知旧草图差异包括 `AUDIT_LOGS` 应为 `activity_logs`、`STAGE_HISTORIES` 应为 `stage_history`，阶段历史没有 `organization_id` 而由 `lead_id` 关联线索，审计主体字段是 `resource_type/resource_id`，阶段历史操作者字段是 `actor_id`，事件时间为 `created_at`。本修正不更改数据库结构。
+
+## 阶段 5 统计关系子图（以 Prisma schema 为准）
+
+```mermaid
+erDiagram
+    ORGANIZATIONS ||--o{ LEADS : organization_id
+    ORGANIZATIONS ||--o{ FOLLOW_UPS : organization_id
+    ORGANIZATIONS ||--o{ USERS : organization_id
+    LEADS ||--o{ FOLLOW_UPS : lead_id
+    USERS o|--o{ LEADS : owner_id
+
+    LEADS {
+      uuid id PK
+      uuid organization_id FK
+      uuid owner_id FK
+      varchar source
+      lead_status status
+      timestamptz created_at
+      timestamptz archived_at
+      timestamptz closed_at
+      varchar lost_reason
+      timestamptz won_at "legacy; excluded from stats"
+      timestamptz lost_at "legacy; excluded from stats"
+    }
+    FOLLOW_UPS {
+      uuid id PK
+      uuid organization_id FK
+      uuid lead_id FK
+      timestamptz occurred_at
+      timestamptz deleted_at
+    }
+    USERS {
+      uuid id PK
+      uuid organization_id FK
+      varchar name
+    }
+```
 
 运行时说明：Java Spring Boot API 位于 `apps/api`，Python FastAPI 位于 `apps/ai`；本地 Java API 使用 `8080` 端口，PostgreSQL 宿主端口统一为 `55432`。以下实体、字段、关系和约束保持不变。
 

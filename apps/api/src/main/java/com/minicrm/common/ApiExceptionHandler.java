@@ -1,6 +1,7 @@
 package com.minicrm.common;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -48,7 +49,16 @@ public class ApiExceptionHandler {
         "VALIDATION_FAILED", "请求参数校验失败", requestId(request)));
   }
 
-  @ExceptionHandler(Exception.class)
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiEnvelope<Object>> handleNotFound(
+            NoHandlerFoundException exception, HttpServletRequest request) {
+        log.warn("No handler, requestId={}, path={}",
+                requestId(request), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiEnvelope.failure(
+                "NOT_FOUND", "接口不存在", requestId(request)));
+    }
+
+    @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiEnvelope<Object>> handleUnexpected(Exception exception, HttpServletRequest request) {
     log.error("Unhandled exception, requestId={}, path={}",
         requestId(request), request.getRequestURI(), exception);

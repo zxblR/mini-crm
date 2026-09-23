@@ -178,3 +178,10 @@
 - 修复：FollowUp INSERT 显式写入 `created_at`、`updated_at`；自动 Task INSERT 以及 Lead 创建/导入 INSERT 同步显式写入两列，避免依赖数据库默认值。
 - 扫描结论：确认遗漏为 FollowUp INSERT 的 `updated_at`（并按约定补齐相关已存在时间列）；activity_logs、lead_tags、stage_history 等表按其实际 schema 的时间列处理，未修改 migration 或阶段 3 业务逻辑。
 - 重要性：Mock JdbcTemplate 无法模拟 NOT NULL、唯一约束和外键错误；FollowUp、Task、Lead、Import 等写库关键路径必须在真实 PostgreSQL 上至少手动验收一次。
+
+## 2026-09-23：阶段 5 统计报表实现待人工验收
+
+- 分支：按本轮开始前人工确认的当前分支 `feature` 工作；未执行 git 命令、未创建/切换其他分支、未提交或推送。
+- 范围：按 ADR 0002 扩展现有 dashboard 统计 API；只做数量/时长，不实现 AI、前端页面、金额、成本、ROI 或导出；未修改 migration。
+- PostgreSQL 集成测试只读取 `MINI_CRM_TEST_DATABASE_URL` 和独立用户名/密码环境变量，并拒绝数据库名不是 `mini_crm_test` 的 URL；在该库单个事务中插入少量合成组织、用户、线索和跟进，调用真实 DashboardStatsService 校验公式，最终强制回滚，不保留测试数据。
+- 验收：本轮未运行 shell、构建、测试、Docker 或数据库命令。人工验收待执行；统计索引需先在 `mini_crm_test` 用合成数据采集 `EXPLAIN (ANALYZE, BUFFERS)`，当前未新增索引 migration。

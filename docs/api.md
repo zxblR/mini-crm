@@ -184,6 +184,30 @@
 
 权限：同 summary。查询：`from,to,ownerId,page,pageSize`。响应：当前可见范围内的阶段变更、跟进和任务事件分页列表。
 
+### 阶段 5 统计报表（兼容扩展）
+
+新统计路由 `/dashboard/overview`、`/dashboard/channels`、`/dashboard/sales-ranking`、`/dashboard/trend`、`/dashboard/loss-reasons`、`/dashboard/response-times` 的时间范围参数为 UTC ISO-8601 offset timestamp，按半开区间 `[from,to)` 过滤；省略时默认最近 30 天，最大跨度 366 天。`from` 必须早于 `to`。`ownerId` 为可选个人范围，`SALES` 强制限定为本人，指定其他成员返回 `403 FORBIDDEN`；跨组织成员 ID 返回 `404 RESOURCE_NOT_FOUND`。`OWNER`、`ADMIN`、`SUPPORT` 默认查看当前组织，且可由 `ownerId` 筛选。统计接口均为只读，`SUPPORT` 可读但无任何写入或导出权限。分页沿用现有 `PageSupport` 和 `meta.page/pageSize/total`，默认 page 1、pageSize 20、最大 100；趋势最多返回 366 个 UTC bucket。既有 dashboard 路由继续按原有可选时间范围语义工作。
+
+所有统计 SQL 强制 `organization_id = 当前 token 组织`。赢单/输单统一使用当前 `leads.status` 与 `closed_at`；legacy `won_at`、`lost_at` 不参与。销售赢单归属当前 `leads.owner_id`，不使用 `stage_history.actor_id`。响应时间是代理指标：`max(0, 首条未删除 follow_ups.occurred_at - leads.created_at)`，其中首条跟进按 `occurred_at` 最早选取。响应时长聚合必须返回 `respondedCount`、`unrespondedCount`、`avgResponseSeconds`（仅已响应样本平均）；分桶单独提供 `unresponded`，不混入 `>7d`。所有分桶按 UTC 计算。
+
+| 接口 | 查询参数 | data |
+| --- | --- | --- |
+| `GET /dashboard/summary`（保留原字段） | `from,to,ownerId,source` | 既有响应字段和兼容行为不变；其中赢单/输单已按当前 `status + closed_at` 解释，不按 pipeline stage 标记。 |
+| `GET /dashboard/sources`（保留） | `from,to,ownerId,page,pageSize` | 每项 `{ source, count, won, conversionRate }`；转化率 = 新增 cohort 中当前赢单且 `closed_at` 非空的线索数 / 此来源新增线索数。 |
+| `GET /dashboard/owners`（保留） | `from,to,source,page,pageSize` | 保留既有 `{ ownerId, ownerName, total, won, overdueTasks, conversionRate }` 字段，赢单按当前 `owner_id` 归属。 |
+| `GET /dashboard/sales-ranking`（新增） | `from,to,ownerId,page,pageSize` | 每项 `{ ownerId, ownerName, followUpCount, wonCount, avgDealCycleSeconds, conversionRate }`；无负责人线索不进入排名。`followUpCount` 仅统计该负责人新增 cohort 线索在范围内发生的未删除跟进；成交与周期按新增 cohort 当前状态及当前负责人。分页 meta 沿用现有格式。 |
+| `GET /dashboard/trend`（新增） | `from,to,granularity=day\|week\|month,ownerId` | 每项 `{ periodStart, leadCount, wonCount }`，`periodStart` 为 UTC bucket 起点。线索按 `created_at`，赢单按当前 `status='won' AND closed_at IS NOT NULL` 的 `closed_at` 统计。返回区间内完整零值桶，最多 366 个点。 |
+| `GET /dashboard/loss-reasons`（新增） | `from,to,ownerId,page,pageSize` | 每项 `{ lostReason, count }`；按 `closed_at` 过滤，当前 status 必须为 lost；空/空白原因显示 `unspecified`。分页 meta 沿用现有格式。 |
+| `GET /dashboard/response-times`（新增） | `from,to,ownerId` | `{ respondedCount, unrespondedCount, avgResponseSeconds, buckets }`。桶固定为 `<1h`、`1h-24h`、`1d-7d`、`>7d`、`unresponded`；每桶含 count。平均时长只包含有首条有效跟进的线索。 |
+
+`GET /dashboard/overview` 新增总览 DTO：`{ totalLeads, newLeads, statusCounts, conversionRate, avgDealCycleSeconds, respondedCount, unrespondedCount, avgResponseSeconds }`。`totalLeads/statusCounts` 为当前非归档线索存量；`newLeads` 为 `[from,to)` 创建的数量；`conversionRate` = 此新增 cohort 中当前 `status=won AND closed_at IS NOT NULL` 数 / 新增数量；`avgDealCycleSeconds` = 该 cohort 当前赢单线索中 `closed_at >= created_at` 样本的 `AVG(closed_at - created_at)` 秒数。`closed_at < created_at` 的记录视为脏数据，不计入 `avgDealCycleSeconds` 样本，但仍计入 `wonCount`。空分母返回 0，空样本平均值返回 null。为兼容已有调用，不更改旧 `/dashboard/summary` 的响应形状。
+
+渠道转化率 = 同一新增 cohort 中当前赢单数 / 该来源新增数；销售转化率 = 该 owner 的新增 cohort 当前赢单数 / 其新增线索数；销售成交周期为该 cohort 当前赢单线索的平均 `closed_at - created_at` 秒数。响应时长均以秒为单位，空样本的 `avgResponseSeconds` 为 `null`。
+
+新增响应 DTO 的 JSON 字段均为 camelCase。新增概念类型为 `StatsOverviewDTO`、`ChannelStatsDTO`、`SalesRankingDTO`、`TrendPointDTO`、`ResponseTimeStatsDTO`、`LossReasonStatsDTO`、`Granularity`。所有 success response 仍使用 `{data,meta,error}`，分页列表沿用已有 `meta` 字段，不建立独立 meta 格式。
+
+阶段 5 仅数量和时间，不提供成交额、客单价、ROI、渠道成本、AI 分析或导出端点。当前只读统计不写操作日志；若后续提供导出，记录 `EXPORT`，metadata 只能含报表标识、UTC 时间范围、粒度和行数，不得含 PII。
+
 ### `GET /audit-logs`
 
 权限：`OWNER`、`ADMIN`。查询：`actorId,action,resourceType,from,to,page,pageSize`。响应：只读审计分页；`metadata` 已脱敏。
