@@ -2,6 +2,8 @@ package com.minicrm.leads;
 
 import com.minicrm.common.PageSupport;
 import com.minicrm.common.SecurityUser;
+import com.minicrm.common.ActivityLogEvents;
+import com.minicrm.common.JdbcTimeUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -51,11 +53,11 @@ public class LeadRepository {
     }
     if (query.from() != null && !query.from().isBlank()) {
       where.append(" AND l.created_at >= ?::timestamptz ");
-      args.add(query.from());
+      args.add(JdbcTimeUtils.toDbTime(Instant.parse(query.from())));
     }
     if (query.to() != null && !query.to().isBlank()) {
       where.append(" AND l.created_at <= ?::timestamptz ");
-      args.add(query.to());
+      args.add(JdbcTimeUtils.toDbTime(Instant.parse(query.to())));
     }
     where.append(Boolean.TRUE.equals(query.archived())
         ? " AND l.archived_at IS NOT NULL "
@@ -88,6 +90,10 @@ public class LeadRepository {
   }
 
   public Map<String, Object> findVisible(SecurityUser actor, UUID id) {
+    return findVisible(actor, id, 1, 20);
+  }
+
+  public Map<String, Object> findVisible(SecurityUser actor, UUID id, Integer timelinePage, Integer timelinePageSize) {
     Map<String, Object> row = jdbc.query("""
         SELECT l.id, l.organization_id, l.name, l.company, l.phone, l.email, l.source,
                l.industry, l.region, l.notes, l.owner_id, l.created_by_id, l.status,
@@ -104,7 +110,8 @@ public class LeadRepository {
       return null;
     }
     row.put("tags", tags(actor.organizationId(), id));
-    row.put("timeline", timeline(actor.organizationId(), id));
+    row.put("timeline", timeline(actor.organizationId(), id,
+        timelinePage == null ? 1 : timelinePage, timelinePageSize == null ? 20 : timelinePageSize));
     return row;
   }
 
@@ -156,14 +163,14 @@ public class LeadRepository {
     jdbc.update("""
         INSERT INTO leads (id, organization_id, name, company, phone, normalized_phone,
           email, normalized_email, source, industry, region, notes, status, owner_id,
-          created_by_id, next_follow_up_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::lead_status, ?, ?, ?, now())
+          created_by_id, next_follow_up_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::lead_status, ?, ?, ?, now(), now())
         """, id, organizationId, LeadContactNormalizer.blank(request.name()),
         LeadContactNormalizer.blank(request.company()), LeadContactNormalizer.blank(request.phone()), phone,
         LeadContactNormalizer.blank(request.email()), email, request.source().trim(),
         LeadContactNormalizer.blank(request.industry()), LeadContactNormalizer.blank(request.region()),
         LeadContactNormalizer.blank(request.notes()), status.value(), ownerId, actorId,
-        request.nextFollowUpAt());
+        JdbcTimeUtils.toDbTime(request.nextFollowUpAt()));
     return id;
   }
 
@@ -182,7 +189,7 @@ public class LeadRepository {
         LeadContactNormalizer.blank(request.phone()), phone, LeadContactNormalizer.blank(request.email()), email,
         LeadContactNormalizer.blank(request.source()), LeadContactNormalizer.blank(request.industry()),
         LeadContactNormalizer.blank(request.region()), LeadContactNormalizer.blank(request.notes()), ownerId,
-        request.nextFollowUpAt(), id, organizationId);
+        JdbcTimeUtils.toDbTime(request.nextFollowUpAt()), id, organizationId);
   }
 
   public void archive(UUID organizationId, UUID id, boolean restore) {
@@ -243,22 +250,54 @@ public class LeadRepository {
     }, leadId, organizationId);
   }
 
-  private List<Map<String, Object>> timeline(UUID organizationId, UUID leadId) {
-    List<Map<String, Object>> values = jdbc.query("""
-        SELECT h.id, 'status_changed' AS type, '状态变更' AS title, h.note AS description,
-               u.name AS actor_name, h.created_at AS occurred_at
-        FROM stage_history h JOIN leads l ON l.id = h.lead_id JOIN users u ON u.id = h.actor_id
-        WHERE h.lead_id = ? AND l.organization_id = ?
-        ORDER BY h.created_at DESC
-        """, (rs, row) -> timelineRow(rs), leadId, organizationId);
-    values.addAll(jdbc.query("""
-        SELECT f.id, 'follow_up' AS type, '跟进记录' AS title, f.summary AS description,
-               u.name AS actor_name, f.occurred_at
-        FROM follow_ups f JOIN users u ON u.id = f.created_by_id
-        WHERE f.lead_id = ? AND f.organization_id = ? AND f.deleted_at IS NULL
-        """, (rs, row) -> timelineRow(rs), leadId, organizationId));
-    values.sort((a, b) -> String.valueOf(b.get("occurredAt")).compareTo(String.valueOf(a.get("occurredAt"))));
-    return values;
+  private List<Map<String, Object>> timeline(UUID organizationId, UUID leadId, int page, int pageSize) {
+    PageSupport.PageRequest paging = PageSupport.request(page, pageSize);
+    int normalizedSize = paging.pageSize();
+    long offset = paging.offset();
+    String sql = """
+        SELECT timeline.id, timeline.type, timeline.title, timeline.description,
+               timeline.actor_name, timeline.occurred_at, timeline.created_at,
+               timeline.deleted, timeline.metadata
+        FROM (
+          SELECT h.id, 'stage_changed' AS type, '状态变更' AS title, h.note AS description,
+                 u.name AS actor_name, h.created_at AS occurred_at, h.created_at AS created_at,
+                 false AS deleted, NULL::jsonb AS metadata
+          FROM stage_history h
+          JOIN users u ON u.id = h.actor_id
+          WHERE h.lead_id = ? AND EXISTS (
+            SELECT 1 FROM leads l WHERE l.id = h.lead_id AND l.organization_id = ?)
+          UNION ALL
+          SELECT f.id, 'follow_up' AS type, '跟进记录' AS title, f.summary AS description,
+                 u.name AS actor_name, f.occurred_at, f.created_at,
+                 (f.deleted_at IS NOT NULL) AS deleted, NULL::jsonb AS metadata
+          FROM follow_ups f
+          JOIN users u ON u.id = f.created_by_id
+          WHERE f.lead_id = ? AND f.organization_id = ?
+          UNION ALL
+          SELECT a.id, CASE
+                   WHEN a.action = ? THEN 'task_completed'
+                   WHEN a.action = ? THEN 'task_cancelled'
+                   WHEN a.action = ? THEN 'task_created'
+                   ELSE 'task_updated' END AS type,
+                 a.action AS title, NULL AS description, u.name AS actor_name,
+                 a.created_at AS occurred_at, a.created_at,
+                 false AS deleted, a.metadata
+          FROM activity_logs a
+          LEFT JOIN users u ON u.id = a.actor_id
+          LEFT JOIN tasks t ON t.id = a.resource_id AND a.resource_type = 'TASK'
+          LEFT JOIN follow_ups f ON f.id = a.resource_id AND a.resource_type = 'FOLLOW_UP'
+          WHERE a.organization_id = ? AND a.resource_type IN ('TASK', 'FOLLOW_UP')
+            AND (t.lead_id = ? OR f.lead_id = ?)
+            AND a.action IN (?, ?, ?, ?, ?)
+        ) timeline
+        ORDER BY timeline.occurred_at DESC, timeline.created_at DESC, timeline.id DESC
+        LIMIT ? OFFSET ?
+        """;
+    return jdbc.query(sql, (rs, row) -> timelineRow(rs), leadId, organizationId,
+        leadId, organizationId, ActivityLogEvents.COMPLETE_TASK, ActivityLogEvents.CANCEL_TASK,
+        ActivityLogEvents.CREATE_TASK, organizationId, leadId, leadId,
+        ActivityLogEvents.CREATE_TASK, ActivityLogEvents.UPDATE_TASK, ActivityLogEvents.COMPLETE_TASK,
+        ActivityLogEvents.CANCEL_TASK, ActivityLogEvents.SKIP_TASK_AUTO_CREATE, normalizedSize, offset);
   }
 
   private Map<String, Object> summary(ResultSet rs) throws SQLException {
@@ -268,10 +307,10 @@ public class LeadRepository {
     value.put("email", rs.getString("email")); value.put("source", rs.getString("source"));
     value.put("industry", rs.getString("industry")); value.put("region", rs.getString("region"));
     value.put("ownerId", rs.getObject("owner_id")); value.put("owner", owner(rs));
-    value.put("status", rs.getString("status")); value.put("nextFollowUpAt", rs.getObject("next_follow_up_at"));
-    value.put("archivedAt", rs.getObject("archived_at")); value.put("closedAt", rs.getObject("closed_at"));
+    value.put("status", rs.getString("status")); value.put("nextFollowUpAt", JdbcTimeUtils.fromDbTime(rs, "next_follow_up_at"));
+    value.put("archivedAt", JdbcTimeUtils.fromDbTime(rs, "archived_at")); value.put("closedAt", JdbcTimeUtils.fromDbTime(rs, "closed_at"));
     value.put("outcomeNote", rs.getString("outcome_note")); value.put("lostReason", rs.getString("lost_reason"));
-    value.put("createdAt", rs.getObject("created_at")); value.put("updatedAt", rs.getObject("updated_at"));
+    value.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at")); value.put("updatedAt", JdbcTimeUtils.fromDbTime(rs, "updated_at"));
     return value;
   }
 
@@ -287,12 +326,12 @@ public class LeadRepository {
   private Map<String, Object> locked(ResultSet rs) throws SQLException {
     Map<String, Object> value = new LinkedHashMap<>();
     value.put("id", rs.getObject("id")); value.put("ownerId", rs.getObject("owner_id"));
-    value.put("status", LeadStatus.fromValue(rs.getString("status"))); value.put("archivedAt", rs.getObject("archived_at"));
+    value.put("status", LeadStatus.fromValue(rs.getString("status"))); value.put("archivedAt", JdbcTimeUtils.fromDbTime(rs, "archived_at"));
     value.put("name", rs.getString("name")); value.put("company", rs.getString("company"));
     value.put("phone", rs.getString("phone")); value.put("email", rs.getString("email"));
     value.put("source", rs.getString("source")); value.put("industry", rs.getString("industry"));
     value.put("region", rs.getString("region")); value.put("notes", rs.getString("notes"));
-    value.put("nextFollowUpAt", rs.getObject("next_follow_up_at")); value.put("closedAt", rs.getObject("closed_at"));
+    value.put("nextFollowUpAt", JdbcTimeUtils.fromDbTime(rs, "next_follow_up_at")); value.put("closedAt", JdbcTimeUtils.fromDbTime(rs, "closed_at"));
     value.put("outcomeNote", rs.getString("outcome_note")); value.put("lostReason", rs.getString("lost_reason"));
     return value;
   }
@@ -308,7 +347,11 @@ public class LeadRepository {
     Map<String, Object> value = new LinkedHashMap<>(); value.put("id", rs.getObject("id"));
     value.put("type", rs.getString("type")); value.put("title", rs.getString("title"));
     value.put("description", rs.getString("description")); value.put("actorName", rs.getString("actor_name"));
-    value.put("occurredAt", rs.getObject("occurred_at")); return value;
+    value.put("occurredAt", JdbcTimeUtils.fromDbTime(rs, "occurred_at"));
+    value.put("deleted", rs.getBoolean("deleted"));
+    Object metadata = rs.getObject("metadata");
+    if (metadata != null) value.put("metadata", metadata);
+    return value;
   }
 
   public record Query(Integer page, Integer pageSize, String keyword, LeadStatus status, UUID ownerId,

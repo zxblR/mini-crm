@@ -1,5 +1,6 @@
 package com.minicrm.pipeline;
 
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.PageSupport;
@@ -138,8 +139,8 @@ public class PipelineStageService {
     result.put("isWon", rs.getBoolean("is_won"));
     result.put("isLost", rs.getBoolean("is_lost"));
     result.put("isActive", rs.getBoolean("is_active"));
-    result.put("createdAt", rs.getObject("created_at"));
-    result.put("updatedAt", rs.getObject("updated_at"));
+    result.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at"));
+    result.put("updatedAt", JdbcTimeUtils.fromDbTime(rs, "updated_at"));
     return result;
   }
 

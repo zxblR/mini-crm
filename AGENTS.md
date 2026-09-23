@@ -81,6 +81,8 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 - UUID、可空性、长度、默认值、唯一约束、外键和枚举值必须与 schema 一一对应。Java 枚举的持久化值必须与 PostgreSQL/接口契约的字面值一致，不得只依赖 Java 常量名。
 - `organization_id` 是组织隔离的必要条件。所有读写、关联和批量操作都必须在 SQL 或 Service 层校验组织归属，不能信任客户端传入的组织 ID。
 - `timestamptz` 对应 Java `Instant`，API 使用 UTC ISO 8601；前端仅在展示层转换用户时区。
+- JdbcTemplate 向 PostgreSQL 绑定时间参数时，不得直接传 `Instant`。统一通过 `JdbcTimeUtils.toDbTime(Instant)` 转成 UTC `OffsetDateTime` 后传参；读取 `timestamptz` 使用 `JdbcTimeUtils.fromDbTime(ResultSet, column)` 转回 `Instant`，保留空值语义。禁止依赖驱动对 `Instant` 的隐式 SQL 类型推断。
+- 任何 `INSERT` 必须显式写入表中存在的 `created_at`/`updated_at` 时间列，不依赖数据库默认值，保证测试库、生产库和不同迁移状态下行为一致。仅有 `created_at` 或无时间列的表按实际 schema 执行。Mock `JdbcTemplate` 无法捕获 NOT NULL、唯一约束或外键错误；涉及写库的关键路径至少要在真实 PostgreSQL 上手动验证一次。
 - 本项目不启用 Hibernate/JPA 自动建表或 `ddl-auto`。若未来新增 Java Entity，只能作为明确的读写映射模型，必须逐字段核对 Prisma schema，并由 migration 管理数据库结构。
 - 结构整理不改变表、字段、索引、枚举或约束；需要变更时必须同时更新 schema、migration、Java 映射、API 契约和测试。
 
@@ -100,7 +102,30 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 - 一个提交只解决一个可回滚主题；不得提交 `.env`、真实 token、客户数据、构建产物、coverage、数据库 dump 或临时文件。
 - Pull Request 必须说明背景、方案、测试命令、迁移说明；涉及 UI 时附截图。合并前必须通过 CI。
 
-## 7. 验收命令
+## 7. 执行环境约束
+
+### 允许（无需审批）
+
+- 只读文件访问：ls、find、cat、type、Get-Content、dir
+- git 只读：git status、git branch、git log、git diff、git show
+- 只读检索：grep、Select-String、findstr
+
+### 禁止（必须人工确认）
+
+- git 写操作：add、commit、push、checkout、merge、branch -d、reset
+- 文件写操作：rm、mv、cp、mkdir、Set-Content、Out-File、echo >>
+- 构建运行：mvn、pnpm、docker、python、java -jar
+- 数据库操作：psql、prisma migrate、prisma db push
+- 禁止 push main、禁止 force push、禁止自动合并 PR
+- 禁止创建、切换、推送任何其他分支
+
+### 工作流
+
+- Codex 负责：读文件、写代码、写文档、写测试、出计划。
+- 人工负责：跑构建、跑测试、跑数据库、git 提交、PR 合并。
+- Codex 生成代码后停止，等人工验收。
+
+## 8. 验收命令
 
 仓库根目录执行：
 
@@ -133,6 +158,6 @@ docker compose config
 
 涉及认证、权限、迁移或关键流程时追加关键 E2E。验收失败必须修复或在实施日志中记录明确的环境阻断原因，不能以“本地可用”替代。
 
-## 8. Definition of Done
+## 9. Definition of Done
 
 目录边界、运行命令、Compose 路径、环境变量和文档保持一致；不引入新业务逻辑、不修改数据库结构；Java、Python、前端和 Prisma 的契约可追溯；日志和审计上下文可关联；强制验收命令通过。

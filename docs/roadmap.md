@@ -71,3 +71,21 @@
 ## 每阶段的共同完成条件
 
 代码、测试、迁移、OpenAPI 和相关文档在同一 PR 内更新；CI 通过；无未解释的 lint/type 错误；涉及 UI 必须附桌面截图；涉及权限必须附允许/拒绝用例；不得把真实客户数据用于测试或提交。
+## 阶段 4.5 backlog
+
+- Scheduler 并发集成测试。
+- Testcontainers / 真实数据库 E2E。
+- 完整认证链路 MockMvc E2E。
+- LeadView 前端启用。
+
+## 阶段 4.5 backlog（不阻塞阶段 5）
+
+- timeline metadata 序列化异常：应为 JSON 对象，实际是 {"type":"jsonb","value":"..."}，需 Jackson 自定义序列化 PGobject
+
+- tasks/today 只返回今日到期和逾期任务，不含明日到期；产品侧评估是否扩展为"未来 3 天"
+
+- Testcontainers 真实 PostgreSQL 集成测试
+
+- ImportJobWorker 测试期间连真实数据库的噪音，需测试 profile 关闭
+
+- timeline cursor 分页（当前 offset）

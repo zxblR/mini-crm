@@ -1,6 +1,7 @@
 package com.minicrm.auth;
 
 import com.minicrm.common.ApiException;
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.SecurityUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -67,10 +68,8 @@ public class AuthService {
                 rs.getObject("id", UUID.class),
                 rs.getObject("user_id", UUID.class),
                 rs.getObject("organization_id", UUID.class),
-                rs.getTimestamp("expires_at").toInstant(),
-                rs.getTimestamp("revoked_at") == null
-                    ? null
-                    : rs.getTimestamp("revoked_at").toInstant())
+                JdbcTimeUtils.fromDbTime(rs, "expires_at"),
+                JdbcTimeUtils.fromDbTime(rs, "revoked_at"))
             : null,
         hash(refreshToken));
     if (current == null || current.revokedAt() != null) throw new ApiException("AUTH_TOKEN_REVOKED", "刷新令牌已撤销", HttpStatus.UNAUTHORIZED);

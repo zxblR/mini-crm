@@ -55,6 +55,7 @@ export interface TimelineEvent {
   description: string | null;
   actorName: string | null;
   occurredAt: string;
+  deleted?: boolean;
   metadata?: Record<string, unknown>;
 }
 

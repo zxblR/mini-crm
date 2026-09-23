@@ -38,6 +38,8 @@ export enum TimelineEventType {
   FollowUp = 'follow_up',
   TaskCreated = 'task_created',
   TaskCompleted = 'task_completed',
+  TaskCancelled = 'task_cancelled',
+  TaskUpdated = 'task_updated',
   Archived = 'archived',
   Restored = 'restored',
 }

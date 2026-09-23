@@ -1,5 +1,6 @@
 package com.minicrm.tags;
 
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.PageSupport;
@@ -58,7 +59,7 @@ public class TagService {
   }
 
   private Map<String, Object> tag(ResultSet rs) throws SQLException {
-    Map<String, Object> result = new LinkedHashMap<>(); result.put("id", rs.getObject("id")); result.put("name", rs.getString("name")); result.put("color", rs.getString("color")); result.put("createdAt", rs.getObject("created_at")); result.put("updatedAt", rs.getObject("updated_at")); return result;
+    Map<String, Object> result = new LinkedHashMap<>(); result.put("id", rs.getObject("id")); result.put("name", rs.getString("name")); result.put("color", rs.getString("color")); result.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at")); result.put("updatedAt", JdbcTimeUtils.fromDbTime(rs, "updated_at")); return result;
   }
   private ApiException notFound() { return new ApiException("RESOURCE_NOT_FOUND", "标签不存在", HttpStatus.NOT_FOUND); }
   public record Request(@NotBlank @Size(max = 40) String name, @Size(max = 7) String color) {}

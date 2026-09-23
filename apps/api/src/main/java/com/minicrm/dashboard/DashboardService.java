@@ -3,6 +3,7 @@ package com.minicrm.dashboard;
 import com.minicrm.common.ApiException;
 import com.minicrm.common.BusinessRules;
 import com.minicrm.common.PageSupport;
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.SecurityUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -250,7 +251,7 @@ public class DashboardService {
     item.put("leadName", rs.getString("lead_name"));
     item.put("title", rs.getString("action"));
     item.put("actorName", rs.getString("actor_name"));
-    item.put("occurredAt", rs.getObject("created_at"));
+    item.put("occurredAt", JdbcTimeUtils.fromDbTime(rs, "created_at"));
     return item;
   }
 

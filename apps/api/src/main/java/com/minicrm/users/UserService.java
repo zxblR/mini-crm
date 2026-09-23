@@ -2,6 +2,7 @@ package com.minicrm.users;
 
 import com.minicrm.common.ActivityLogService;
 import com.minicrm.common.ApiException;
+import com.minicrm.common.JdbcTimeUtils;
 import com.minicrm.common.PageSupport;
 import com.minicrm.common.SecurityUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -319,8 +320,8 @@ public class UserService {
     result.put("phone", rs.getString("phone"));
     result.put("roleCodes", roles(rs));
     result.put("isActive", rs.getBoolean("is_active"));
-    result.put("lastLoginAt", rs.getObject("last_login_at"));
-    result.put("createdAt", rs.getObject("created_at"));
+    result.put("lastLoginAt", JdbcTimeUtils.fromDbTime(rs, "last_login_at"));
+    result.put("createdAt", JdbcTimeUtils.fromDbTime(rs, "created_at"));
     return result;
   }
 

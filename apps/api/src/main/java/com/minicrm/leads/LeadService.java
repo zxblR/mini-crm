@@ -52,7 +52,11 @@ public class LeadService {
   }
 
   public Map<String, Object> get(SecurityUser actor, UUID id) {
-    Map<String, Object> lead = repository.findVisible(actor, id);
+    return get(actor, id, 1, 20);
+  }
+
+  public Map<String, Object> get(SecurityUser actor, UUID id, Integer timelinePage, Integer timelinePageSize) {
+    Map<String, Object> lead = repository.findVisible(actor, id, timelinePage, timelinePageSize);
     if (lead == null) throw notFound();
     return lead;
   }
