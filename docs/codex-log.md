@@ -185,3 +185,15 @@
 - 范围：按 ADR 0002 扩展现有 dashboard 统计 API；只做数量/时长，不实现 AI、前端页面、金额、成本、ROI 或导出；未修改 migration。
 - PostgreSQL 集成测试只读取 `MINI_CRM_TEST_DATABASE_URL` 和独立用户名/密码环境变量，并拒绝数据库名不是 `mini_crm_test` 的 URL；在该库单个事务中插入少量合成组织、用户、线索和跟进，调用真实 DashboardStatsService 校验公式，最终强制回滚，不保留测试数据。
 - 验收：本轮未运行 shell、构建、测试、Docker 或数据库命令。人工验收待执行；统计索引需先在 `mini_crm_test` 用合成数据采集 `EXPLAIN (ANALYZE, BUFFERS)`，当前未新增索引 migration。
+## 2026-09-24：阶段 6 AI 智能跟进实现
+
+- 分支：沿用 feature；本轮未创建、切换、提交或推送其他分支。
+- 范围：新增 AI suggestion Prisma model、不可变 migration、FastAPI 内部五类能力、Java 同步调用/缓存/RBAC/审计、共享 TypeScript 类型和契约测试；未写前端页面，未修改阶段 3/4/5 业务逻辑或既有 migration。
+- 决策：Roadmap 阶段 5.5 为金额报表 backlog，阶段 6 为 AI，阶段 6.5 为清理 backlog，阶段 7～10 调整为前端骨架、业务页面、联调 Docker、文档 cloc 汇报；SUPPORT 仅可读 AI 结果；Java RestClient 2s/8s/10s 同步预算；PostgreSQL 承担缓存，不引 Redis；默认 DeepSeek OpenAI-compatible，测试使用 mock LLM；旧 FastAPI 路由保持兼容。
+- 隐私：上下文在 Java 侧移除联系方式和负责人标识；操作日志只保存类型、prompt 版本、模型、缓存结果、延迟和错误码等非 PII metadata。
+- 验收：遵循人工验收规则，本轮未执行 shell、Maven、pnpm、Python、Docker、数据库或测试命令。必须由人工完成 mvn -f apps/api/pom.xml test、python -m compileall apps/ai、前端 lint/build、docker compose config，并在独立 PostgreSQL 与真实 FastAPI + mock LLM 环境完成端到端验证。
+## 2026-09-24：阶段 6 AI 智能跟进
+
+- 依据 ADR 0003 固化 Roadmap、权限、超时、缓存、LLM 供应商和 FastAPI 兼容决策。
+- 新增 `ai_suggestions` schema/migration、Java AI 调用链、FastAPI 内部端点、共享 TS 契约和 prompt 文件。
+- 未执行 shell 命令、构建、测试、数据库操作或 Git 写操作；待人工验收。

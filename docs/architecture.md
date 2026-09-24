@@ -37,9 +37,25 @@ flowchart LR
 6. Redis 由本地 Compose 提供缓存和异步能力所需的基础设施；未启用的队列逻辑不在本次目录整理中新增。
 7. `packages/shared` 只为前端 TypeScript 提供共享类型和常量，不作为 Java 或 Python 的运行时依赖。
 
+## 阶段 6 AI 调用边界
+
+Java AiController 负责 /api/v1/leads/{id}/ai/* 协议适配，AiService 负责组织隔离、RBAC、最小上下文、缓存键和事务边界，AiSuggestionRepository 负责参数化 JdbcTemplate SQL。Java 释放读取事务后通过 RestClient 调用 FastAPI，再以短事务 upsert ai_suggestions 和写入 AI_SUGGESTION 操作日志。所有 timestamptz 参数通过 JdbcTimeUtils 转换，INSERT 显式传入 created_at/updated_at。
+
+FastAPI 保留现有 /health 和 /v1/follow-up-suggestions，只在 main.py 注册 ai_service 新路由。新内部路径为 /internal/v1/intent-score、/follow-up-summary、/next-action、/script、/wake-up，由 AI_SERVICE_TOKEN Bearer 鉴权；AI 服务不连接业务数据库。DeepSeek 是默认 OpenAI-compatible LLM，测试只允许本地 mock HTTP 服务。
+
+AI 结果只使用 PostgreSQL ai_suggestions 持久化和缓存，不引入 Redis。过期结果保留并在查询时重算；清理属于阶段 6.5 backlog。Java 到 FastAPI 连接超时 2 秒、读取超时 8 秒、总预算 10 秒，最多重试一次（连接异常或 429/502/503/504）。
+
 ## 部署边界
 
 - `docker-compose.yml` 使用 `infra/docker/api.Dockerfile` 和 `infra/docker/ai.Dockerfile` 构建 API、AI 服务。
 - PostgreSQL 宿主机端口统一为 `55432`，Java 容器通过 Compose 服务名 `postgres` 访问。
 - API 容器通过服务名 `ai` 访问 FastAPI；宿主机访问 AI 端口仅用于本地开发和调试。
 - `archive/api-nest` 是历史迁移参考，不加入 pnpm workspace，不被 Compose 构建。
+## 阶段 6 AI 调用边界
+
+请求链路为：浏览器 -> Java Controller -> 鉴权/RBAC/组织归属/负责人校验 -> PostgreSQL 缓存查询 -> FastAPI -> OpenAI-compatible LLM。FastAPI 不访问业务数据库，也不持有业务状态；浏览器永远不直接访问 AI 服务。
+
+Java 查询事务在调用 FastAPI 前结束，外部调用完成后以短事务执行 `ai_suggestions` upsert。所有时间参数通过 `JdbcTimeUtils.toDbTime` 绑定，INSERT 显式写入 `created_at` 和 `updated_at`。日志仅记录 `AI_SUGGESTION` 事件的类型、资源 ID 和组织上下文，不记录 prompt、邮箱、手机号、token 或客户原文。
+
+`apps/ai/main.py` 保留既有 `/health` 等接口，新 AI 实现位于 `apps/ai/ai_service/`，prompt 位于 `apps/ai/prompts/<type>/v1.md`。客户文本被作为不可信数据传入，system prompt 要求忽略其中指令。
+组织 ID 以已认证 principal/details 中的声明为准，`X-Organization-Id` 只用于一致性校验；声明与请求头不一致统一返回 404。

@@ -5,4 +5,5 @@ export * from './enums';
 export * from './followups';
 export * from './leads';
 export * from './tasks';
+export * from './ai';
 export * from './users';

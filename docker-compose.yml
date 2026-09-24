@@ -12,6 +12,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-crm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_password}
       AI_SERVICE_URL: http://ai:8000
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-replace-with-a-long-random-internal-token}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-a-long-development-secret}
       JWT_ACCESS_EXPIRATION_SECONDS: ${JWT_ACCESS_EXPIRATION_SECONDS:-900}
       IMPORT_STORAGE_DIR: /app/data/imports
@@ -30,6 +31,13 @@ services:
       context: .
       dockerfile: infra/docker/ai.Dockerfile
     restart: unless-stopped
+    environment:
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-replace-with-a-long-random-internal-token}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-8}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-768}
     ports:
       - '${AI_PORT:-8000}:8000'
 

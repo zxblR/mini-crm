@@ -27,6 +27,16 @@ app:
     expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:900}
   ai:
     base-url: ${AI_SERVICE_URL:http://localhost:8000}
+    service-token: ${AI_SERVICE_TOKEN:}
+    connect-timeout-ms: ${AI_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${AI_READ_TIMEOUT_MS:8000}
+    total-budget-ms: ${AI_TOTAL_BUDGET_MS:10000}
+    model: ${LLM_MODEL:deepseek-chat}
+    intent-score-prompt-version: ${AI_PROMPT_INTENT_SCORE_VERSION:intent-score-v1}
+    follow-up-summary-prompt-version: ${AI_PROMPT_FOLLOW_UP_SUMMARY_VERSION:follow-up-summary-v1}
+    next-action-prompt-version: ${AI_PROMPT_NEXT_ACTION_VERSION:next-action-v1}
+    script-prompt-version: ${AI_PROMPT_SCRIPT_VERSION:script-v1}
+    wake-up-prompt-version: ${AI_PROMPT_WAKE_UP_VERSION:wake-up-v1}
   import:
     storage-dir: ${IMPORT_STORAGE_DIR:./data/imports}
   scheduler:
