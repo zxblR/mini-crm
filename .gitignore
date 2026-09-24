@@ -28,3 +28,10 @@ apps/api/data/
 playwright-report/
 test-results/
 *.tsbuildinfo
+
+# 本地临时文件
+body.json
+api-ai.log
+api-ai-new.log
+*.local
+
