@@ -38,35 +38,35 @@
 
 验收：`mvn -f apps/api/pom.xml test`；MockMvc 验证 401/403/404/正常流；使用独立 `mini_crm_test` 真实 PostgreSQL 验证聚合与时间类型；合成数据执行 `EXPLAIN (ANALYZE, BUFFERS)`，仅在核心表出现有实质影响的 Seq Scan 时考虑新增索引 migration。
 
-## 阶段 6：任务、提醒与 BullMQ
+## 阶段 5.5：金额报表（backlog）
 
-目标：下一步任务、完成/取消/改期、逾期查询、Redis 队列 worker 和幂等提醒作业。
+目标：未来在明确金额字段、数据来源和统计口径后规划金额报表；本阶段不实施，不影响阶段 6。
 
-验收：`docker compose up -d postgres redis`; `cd apps/api; mvn test`; `pnpm test:e2e -- tasks`；验证 Java 队列消费者日志。
+## 阶段 6：AI 智能跟进（本次）
 
-## 阶段 7：仪表盘与 ECharts（历史编号，已并入阶段 5）
+目标：增加意向评分、跟进摘要、下一步建议、话术生成和沉默唤醒；Java 是唯一业务入口，FastAPI 只提供内部 AI 能力。结果由 PostgreSQL 保存并缓存，不引 Redis 队列或缓存。过期结果读取时重算，定期清理留待阶段 6.5。
 
-历史说明：原阶段 7 规划的摘要、漏斗、来源、负责人排行和 ECharts 仪表盘已随阶段 3/4 及阶段 5 统计报表规划合并；本阶段编号保留用于追溯，不再作为独立交付阶段。本次阶段 5 不实现前端页面。
+验收：`mvn -f apps/api/pom.xml test`; `python -m compileall apps/ai`; `pnpm -C apps/web lint`; `pnpm -C apps/web build`; `docker compose config`。人工完成真实 FastAPI + mock LLM + 独立 PostgreSQL 的端到端验证，以及权限、超时、降级和 migration 检查；禁止测试时调用付费 LLM。
 
-验收：无独立验收项，按阶段 5 的 API 和 PostgreSQL 报表验收执行。
+## 阶段 6.5：AI 结果定期清理（backlog）
 
-## 阶段 8：导入、审计与可运维性
+目标：按保留策略定期清理已过期 `ai_suggestions`；阶段 6 只在查询时将过期结果视为缓存未命中，不主动删除。
 
-目标：CSV 异步导入、任务状态、关键写操作审计、结构化日志、request ID、健康/就绪检查和基础限流。
+## 阶段 7：前端骨架
 
-验收：`pnpm test:e2e -- import audit`; `curl http://localhost:8080/api/v1/ready`; `docker compose config`; 验证非法 CSV 不污染已有数据。
+目标：搭建路由、布局、导航、认证状态、API 客户端和基础设计系统，不在阶段 6 实现页面。
 
-## 阶段 9：质量、性能与安全加固
+## 阶段 8：前端业务页面
 
-目标：补齐边界测试、权限矩阵、SQL/索引检查、备份恢复演练、依赖漏洞扫描和核心列表性能基线。
+目标：实现线索、跟进、任务、AI 建议和统计报表页面，并覆盖加载、空、错误及权限状态。
 
-验收：`pnpm lint`; `pnpm format:check`; `pnpm typecheck`; `pnpm test`; `pnpm test:e2e`; `pnpm build`; `pnpm audit --prod`；并记录 p95 测试结果。
+## 阶段 9：联调 + Docker 一键启动
 
-## 阶段 10：发布与 MVP 验收
+目标：完成前后端联调，校验 Compose 一键启动、健康检查、环境变量和本地完整业务流程。
 
-目标：生成版本候选、生产 Compose 配置、迁移发布流程、回滚说明、用户验收脚本和发布文档；确认 PRD 的 MVP 边界没有越界。
+## 阶段 10：文档 + cloc + 汇报
 
-验收：`docker compose -f docker-compose.yml config`; `docker compose up -d`; `cd apps/api; mvn test`; `pnpm test:e2e`; `docker compose down`；由 Admin、Sales、Viewer 各完成一次登录→线索→跟进→看板验收。
+目标：收敛架构/API/运维文档，统计代码规模（cloc），整理验收结果与项目汇报材料。
 
 ## 每阶段的共同完成条件
 
@@ -96,4 +96,14 @@
 
 ## 阶段编号历史说明
 
-本路线图早期的阶段 5 指“阶段看板与跟进时间线”，早期阶段 7 指“仪表盘与 ECharts”。按 ADR 0002，原阶段 5 调整至阶段 3.5 pipeline backlog，原阶段 7 仪表盘统计并入当前阶段 5；此历史说明保留以避免旧计划编号失去上下文。
+本路线图早期的阶段 5 指“阶段看板与跟进时间线”，早期阶段 6 指“任务、提醒与 BullMQ”，早期阶段 7 指“仪表盘与 ECharts”，早期阶段 8～10 指导入运维、质量加固和发布验收。按 ADR 0002，原阶段 5 调整至阶段 3.5 pipeline backlog，原阶段 7 统计并入当前阶段 5。按 ADR 0003，现阶段 5.5 为金额报表 backlog、阶段 6 为 AI 智能跟进，后续阶段 7～10 调整为前端骨架、前端业务页面、联调与 Docker 一键启动、文档/cloc/汇报。历史编号保留供追溯。
+## 调整后的阶段编号（ADR 0003）
+
+- 阶段 5.5：金额报表（backlog，不实施）
+- 阶段 6：AI 智能跟进（本次）
+- 阶段 7：前端骨架
+- 阶段 8：前端业务页面
+- 阶段 9：联调 + Docker 一键启动
+- 阶段 10：文档 + cloc + 汇报
+
+历史阶段编号保留在原记录中，不追溯改写已合并阶段 3/4/5 的内容。阶段 6.5 定期清理过期 `ai_suggestions` 为 backlog。

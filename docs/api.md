@@ -224,7 +224,31 @@ Java API 通过服务端网络调用 AI 服务，浏览器不得直接调用 `AI
 
 服务：Python AI；当前内部开发接口。请求：`{ "lead_name": "王敏", "context": "已确认下周提供方案" }`。响应：`{ "suggestion": "...", "service": "ai-python" }`。生产环境必须由 Java API 负责用户认证、组织归属校验、超时、重试和敏感信息脱敏。
 
-## 8. 枚举与字段约束
+## 8. 阶段 6 AI 智能跟进
+
+浏览器只访问 Java API，不能访问 AI_SERVICE_URL。生成接口为同步调用：连接超时 2 秒，读取超时 8 秒，总下游预算 10 秒；Java 最多重试一次，仅对连接异常和 429/502/503/504 重试。因此在重试和网络抖动下，AI 请求 P99 可能达到 10-12 秒，客户端必须显示加载状态并处理 429/503。AI 依赖不可用时不返回伪造成功结果；没有有效缓存时返回 503 AI_DEPENDENCY_UNAVAILABLE。
+
+触发 AI 仅允许 OWNER、ADMIN 和负责人 SALES。SUPPORT 不能触发，但可以在其可见范围内只读查看 ai_suggestions。跨组织或超出资源可见范围统一返回 404 RESOURCE_NOT_FOUND。
+
+POST /leads/:id/ai/score：权限为 OWNER、ADMIN、负责人 SALES。请求为 { forceRefresh?: boolean }，响应 data 是 AiSuggestionDTO，result 包含 score(0..100)、band、confidence、factors、caveats。
+
+POST /leads/:id/ai/summary：输入由服务端取最近 20 条未删除跟进（最多 180 天、8,000 字符），result 包含 summary、keyPoints、outcomes、openQuestions、lastInteractionAt。
+
+POST /leads/:id/ai/next-action：result 包含 actionType、title、rationale、suggestedDueAt、priority、prerequisites；只生成建议，不自动创建任务。
+
+POST /leads/:id/ai/script：请求包含 customerType、channel、objective、objection、forceRefresh；result 包含 opening、objectionReplies、closing、disclaimer。
+
+POST /leads/:id/ai/wake-up：服务端仅对未归档且非终态线索计算沉默期，默认 14 天；result 包含 shouldWakeUp、inactivityDays、reason、recommendedChannel、message、suggestedDueAt。
+
+GET /leads/:id/ai/suggestions：按 Lead 可见范围读取，SUPPORT 只读允许；查询 type、page、pageSize（最大 100），data 为分页 AiSuggestionDTO 列表。
+
+所有生成接口支持 forceRefresh。PostgreSQL ai_suggestions 以 organizationId + leadId + type + promptVersion + inputHash 作为缓存键；TTL 到期不主动删除，查询时视为未命中并重算。阶段 6.5 才规划定期清理，不使用 Redis。
+
+内部 FastAPI 路径为 /internal/v1/intent-score、/follow-up-summary、/next-action、/script、/wake-up，要求 AI_SERVICE_TOKEN Bearer 鉴权。默认 LLM 为 DeepSeek OpenAI-compatible；本地测试必须连接 mock LLM HTTP 服务，禁止请求付费 API。生产部署时由人工提供 LLM_API_KEY。
+
+所有成功响应都沿用本文件通用 data/meta/error 包络；前述 DTO 指 data 内容。AI 降级不伪成功：缓存 miss 且服务不可用时返回 503。
+
+## 9. 枚举与字段约束
 
 - 角色：`OWNER|ADMIN|SALES|SUPPORT`；`SUPPORT` 为只读角色且不可导出。后台 Worker 不属于用户角色。
 - 线索状态：`new|contacted|qualified|proposal|negotiation|won|lost`。
@@ -264,3 +288,14 @@ Java API 通过服务端网络调用 AI 服务，浏览器不得直接调用 `AI
 - `404 RESOURCE_NOT_FOUND`：资源不存在、属于其他组织，或不在调用者的资源可见范围内。跨组织和跨负责人直接按资源 ID 访问时使用该错误，避免泄露存在性。
 - `409 LEAD_DUPLICATE`：同组织规范化邮箱或手机号冲突；`candidateLeadIds` 只能包含调用者可见的候选。
 - `409 STAGE_INVALID_TRANSITION`：固定 `LeadStatus` 的迁移不在角色对应矩阵内，或线索当前不可迁移。
+## AI 智能跟进（阶段 6）
+
+浏览器只调用 Java API：`POST /api/v1/leads/{leadId}/ai/{intent-score|follow-up-summary|next-action|script|wake-up}`，以及 `GET /api/v1/leads/{leadId}/ai/{type}`。POST 请求体为 `{ "forceRefresh": false }`。响应遵循 `{ data, meta, error }`。
+
+触发 AI 仅允许 OWNER、ADMIN 和该线索负责人的 SALES。SUPPORT 只能 GET 已保存的 `ai_suggestions`。跨组织访问统一返回 404，不泄露资源存在性。
+
+Java API 到 FastAPI 使用 Bearer `AI_SERVICE_TOKEN`。连接超时 2 秒、读取超时 8 秒、总预算 10 秒；最多重试 1 次，仅针对连接异常、429、502、503、504。受重试和排队影响，P99 可能达到 10-12 秒。超过预算返回 503；供应商限流返回 429。
+
+缓存由 PostgreSQL `ai_suggestions` 承担，唯一键为组织、线索、类型、`input_hash`、`prompt_version`。TTL 到期查询时视为未命中并重算；本阶段不主动删除过期记录，定期清理为阶段 6.5 backlog。不使用 Redis。
+
+AI 服务内部端点为 `/internal/v1/intent-score`、`/follow-up-summary`、`/next-action`、`/script`、`/wake-up`，必须携带 Bearer token。默认 LLM 为 DeepSeek 的 OpenAI-compatible 接口，配置来自 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。本地测试必须使用 mock LLM HTTP 服务，禁止真调付费 API。

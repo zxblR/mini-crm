@@ -55,7 +55,18 @@ enum ImportJobStatus {
   @@map("import_job_status")
 }
 
+enum AiSuggestionType {
+  intent_score
+  follow_up_summary
+  next_action
+  script
+  wake_up
+
+  @@map("ai_suggestion_type")
+}
+
 model Organization {
+  aiSuggestions AiSuggestion[]
   id            String          @id @default(uuid()) @db.Uuid
   name          String          @db.VarChar(120)
   slug          String          @unique @db.VarChar(80)
@@ -72,6 +83,7 @@ model Organization {
   activityLogs  ActivityLog[]
   importJobs    ImportJob[]
   refreshTokens RefreshToken[]
+  aiSuggestions AiSuggestion[]
 
   @@map("organizations")
 }
@@ -100,6 +112,7 @@ model User {
   activityLogs    ActivityLog[]
   refreshTokens   RefreshToken[]
   importJobs      ImportJob[]
+  aiSuggestions   AiSuggestion[]
 
   @@unique([organizationId, normalizedEmail], map: "users_org_email_unique")
   @@unique([organizationId, normalizedPhone], map: "users_org_phone_unique")
@@ -163,6 +176,7 @@ model PipelineStage {
 }
 
 model Lead {
+  aiSuggestions AiSuggestion[]
   id              String         @id @default(uuid()) @db.Uuid
   organizationId  String         @map("organization_id") @db.Uuid
   name            String?        @db.VarChar(100)
@@ -196,6 +210,7 @@ model Lead {
   stageHistory    StageHistory[]
   followUps       FollowUp[]
   tasks           Task[]
+  aiSuggestions   AiSuggestion[]
 
   @@index([organizationId, archivedAt, updatedAt])
   @@index([organizationId, ownerId, archivedAt])
@@ -345,4 +360,60 @@ model ImportJob {
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
   @@map("import_jobs")
+}
+
+model AiSuggestion {
+  id            String           @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  leadId        String           @map("lead_id") @db.Uuid
+  requestedById String?          @map("requested_by_id") @db.Uuid
+  type          AiSuggestionType
+  promptVersion String           @map("prompt_version") @db.VarChar(40)
+  inputHash     String           @map("input_hash") @db.Char(64)
+  model         String           @db.VarChar(100)
+  result        Json
+  score         Int?
+  confidence    Decimal?         @db.Decimal(4, 3)
+  inputTokens   Int?             @map("input_tokens")
+  outputTokens  Int?             @map("output_tokens")
+  expiresAt     DateTime?        @map("expires_at") @db.Timestamptz(3)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lead          Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  requestedBy   User?            @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, leadId, type, promptVersion, inputHash], map: "ai_suggestions_cache_key")
+  @@index([organizationId, leadId, type, updatedAt])
+  @@map("ai_suggestions")
+}
+enum AiSuggestionType {
+  INTENT_SCORE
+  FOLLOW_UP_SUMMARY
+  NEXT_ACTION
+  SCRIPT
+  WAKE_UP
+}
+
+model AiSuggestion {
+  id             String           @id @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  leadId         String           @map("lead_id") @db.Uuid
+  createdBy      String           @map("created_by") @db.Uuid
+  type           AiSuggestionType @map("suggestion_type")
+  inputHash      String           @map("input_hash") @db.VarChar(64)
+  promptVersion  String           @map("prompt_version") @db.VarChar(32)
+  result         Json
+  model          String           @db.VarChar(128)
+  expiresAt      DateTime         @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  lead         Lead         @relation(fields: [leadId], references: [id])
+
+  @@unique([organizationId, leadId, type, inputHash, promptVersion], name: "ai_suggestions_cache_key")
+  @@index([organizationId, leadId])
+  @@index([expiresAt])
+  @@map("ai_suggestions")
 }
