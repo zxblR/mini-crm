@@ -1,4 +1,10 @@
 module.exports = {
+  globals: {
+    ElMessage: 'readonly',
+    ElMessageBox: 'readonly',
+    ElNotification: 'readonly',
+    ElLoading: 'readonly',
+  },
   root: true,
   env: {
     es2022: true,

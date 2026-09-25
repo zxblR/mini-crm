@@ -29,6 +29,14 @@ export interface ApiErrorEnvelope {
   error: ApiError;
 }
 
+export type ApiResponse<T> = ApiEnvelope<T> | ApiErrorEnvelope;
+
+export interface PaginationMeta extends ApiMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export interface PageQuery {
   page?: number;
   pageSize?: number;

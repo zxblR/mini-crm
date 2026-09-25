@@ -71,6 +71,11 @@ export interface LeadQuery extends PageQuery {
   sortOrder?: SortOrder;
 }
 
+export interface LeadTimelineQuery {
+  timelinePage?: number;
+  timelinePageSize?: number;
+}
+
 export type LeadExportQuery = Omit<LeadQuery, 'page' | 'pageSize'>;
 
 export interface CreateLeadRequest {

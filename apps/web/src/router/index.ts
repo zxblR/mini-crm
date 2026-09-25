@@ -25,8 +25,20 @@ const router = createRouter({
         {
           path: 'leads',
           name: 'leads',
-          component: () => import('@/components/common/RoutePlaceholder.vue'),
+          component: () => import('@/views/LeadListView.vue'),
           meta: { requiresAuth: true, title: '线索', menuKey: 'leads' },
+        },
+        {
+          path: 'leads/board',
+          name: 'lead-board',
+          component: () => import('@/views/LeadBoardView.vue'),
+          meta: { requiresAuth: true, title: '线索看板', menuKey: 'leads' },
+        },
+        {
+          path: 'leads/:id',
+          name: 'lead-detail',
+          component: () => import('@/views/LeadDetailView.vue'),
+          meta: { requiresAuth: true, title: '线索详情', menuKey: 'leads' },
         },
         {
           path: 'tasks',

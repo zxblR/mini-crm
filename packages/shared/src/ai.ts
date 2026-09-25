@@ -5,18 +5,24 @@ export type AiSuggestionType =
   | 'SCRIPT'
   | 'WAKE_UP'
 
-export interface AiLeadContext {
-  leadId: string
-  customerText?: string
-  recentFollowUps?: string[]
-  stage?: string
-  ownerId?: string
-}
+export const AI_POST_PATHS = {
+  INTENT_SCORE: 'intent-score',
+  FOLLOW_UP_SUMMARY: 'follow-up-summary',
+  NEXT_ACTION: 'next-action',
+  SCRIPT: 'script',
+  WAKE_UP: 'wake-up',
+} as const;
 
-export interface AiRequest {
-  leadId: string
-  forceRefresh?: boolean
-  context?: AiLeadContext
+export const AI_GET_TYPES = {
+  INTENT_SCORE: 'INTENT_SCORE',
+  FOLLOW_UP_SUMMARY: 'FOLLOW_UP_SUMMARY',
+  NEXT_ACTION: 'NEXT_ACTION',
+  SCRIPT: 'SCRIPT',
+  WAKE_UP: 'WAKE_UP',
+} as const;
+
+export interface GenerateAiSuggestionInput {
+  forceRefresh: boolean;
 }
 
 export interface AiSuggestion<T = unknown> {
@@ -29,12 +35,3 @@ export interface AiSuggestion<T = unknown> {
   expiresAt: string
   cached: boolean
 }
-
-export type AiApiError = {
-  ok: false
-  error: { code: string; message: string }
-}
-
-export type AiApiSuccess<T> = { ok: true; data: T; meta?: Record<string, unknown> }
-
-export type AiApiResult<T> = AiApiSuccess<T> | AiApiError

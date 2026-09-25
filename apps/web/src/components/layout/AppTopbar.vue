@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import { Menu, UserFilled } from '@element-plus/icons-vue';
 import { ROLE_LABELS } from '@mini-crm/shared';
 
