@@ -15,6 +15,9 @@ const ui = useUiStore();
 const visibleItems = computed(() =>
   navigationItems.filter((item) => auth.hasAnyRole(item.roles)),
 );
+const activePath = computed(() =>
+  route.meta.menuKey ? '/' + route.meta.menuKey : route.path,
+);
 const isCollapsed = computed(() => ui.sidebarCollapsed && !ui.mobileSidebarOpen);
 
 function navigate(path: string): void {
@@ -45,7 +48,7 @@ function navigate(path: string): void {
 
     <el-menu
       class="sidebar-menu"
-      :default-active="route.path"
+      :default-active="activePath"
       :collapse="isCollapsed"
       @select="navigate"
     >

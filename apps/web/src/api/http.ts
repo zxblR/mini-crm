@@ -1,5 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { ElMessage } from 'element-plus';
+import type { ApiErrorEnvelope } from '@mini-crm/shared';
 
 import { pinia } from '@/stores/pinia';
 import { useAuthStore } from '@/stores/auth';
@@ -39,6 +39,35 @@ function getStoredAccessToken(): string | null {
   }
 }
 
+export interface NormalizedApiError {
+  code: string | null;
+  message: string;
+  details: Record<string, unknown>;
+  requestId: string | null;
+  status: number | null;
+}
+
+export function normalizeApiError(error: unknown): NormalizedApiError {
+  if (axios.isAxiosError<ApiErrorEnvelope>(error)) {
+    const body = error.response?.data;
+    return {
+      code: body?.error?.code ?? null,
+      message: body?.error?.message ?? getApiErrorMessage(error),
+      details: body?.error?.details ?? {},
+      requestId: body?.meta?.requestId ?? null,
+      status: error.response?.status ?? null,
+    };
+  }
+
+  return {
+    code: null,
+    message: error instanceof Error ? error.message : '请求失败，请稍后重试',
+    details: {},
+    requestId: null,
+    status: null,
+  };
+}
+
 function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const responseData = error.response?.data as
@@ -74,8 +103,12 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 http.interceptors.request.use((config) => {
-  const token = getStoredAccessToken();
+  const auth = useAuthStore(pinia);
+  const token = auth.accessToken ?? getStoredAccessToken();
   if (token && !isAuthEndpoint(config.url)) setAuthorization(config, token);
+  if (auth.user?.organizationId) {
+    config.headers.set('X-Organization-Id', auth.user.organizationId);
+  }
   return config;
 });
 
