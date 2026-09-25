@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { normalizeApiError } from '@/api/http';
 import AsyncPageState from '@/components/common/AsyncPageState.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
+import AiSuggestionPanel from '@/components/ai/AiSuggestionPanel.vue';
 import FollowUpList from '@/components/followups/FollowUpList.vue';
 import LeadFormDialog from '@/components/leads/LeadFormDialog.vue';
 import LeadInfoCard from '@/components/leads/LeadInfoCard.vue';
@@ -72,6 +73,7 @@ watch(leadId, () => {
         <div class="detail-main">
           <LeadInfoCard :lead="store.detail" />
           <FollowUpList :lead="store.detail" @changed="load" />
+          <AiSuggestionPanel :lead="store.detail" />
         </div>
         <LeadTimeline :events="store.detail.timeline" />
       </div>

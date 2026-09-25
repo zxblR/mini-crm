@@ -26,9 +26,9 @@ interface LeadFormModel {
   region: string;
   notes: string;
   status: OpenLeadStatus;
-  ownerId: string | null;
+  ownerId: string | undefined;
   tagIds: string[];
-  nextFollowUpAt: Date | null;
+  nextFollowUpAt: Date | undefined;
 }
 
 const props = defineProps<{
@@ -60,9 +60,9 @@ function emptyForm(): LeadFormModel {
     region: '',
     notes: '',
     status: LeadStatus.New,
-    ownerId: null,
+    ownerId: undefined,
     tagIds: [],
-    nextFollowUpAt: null,
+    nextFollowUpAt: undefined,
   };
 }
 
@@ -81,9 +81,9 @@ function resetForm(): void {
           region: lead.region ?? '',
           notes: 'notes' in lead ? lead.notes ?? '' : '',
           status: LeadStatus.New,
-          ownerId: lead.ownerId,
+          ownerId: lead.ownerId ?? undefined,
           tagIds: lead.tags.map((tag) => tag.id),
-          nextFollowUpAt: lead.nextFollowUpAt ? new Date(lead.nextFollowUpAt) : null,
+          nextFollowUpAt: lead.nextFollowUpAt ? new Date(lead.nextFollowUpAt) : undefined,
         }
       : emptyForm(),
   );
@@ -145,7 +145,7 @@ async function submit(): Promise<void> {
     if (!isEdit.value || (props.lead && 'notes' in props.lead) || form.notes.trim()) {
       common.notes = nullable(form.notes);
     }
-    if (permissions.isManager.value) common.ownerId = form.ownerId;
+    if (permissions.isManager.value) common.ownerId = form.ownerId ?? null;
 
     const input: CreateLeadRequest | UpdateLeadRequest = isEdit.value
       ? common

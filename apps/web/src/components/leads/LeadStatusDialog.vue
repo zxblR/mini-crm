@@ -15,7 +15,7 @@ import {
 import { useLeadStore } from '@/stores/leads';
 
 interface StatusForm {
-  status: LeadStatus | null;
+  status: LeadStatus | undefined;
   note: string;
   outcomeNote: string;
   lostReason: string;
@@ -30,7 +30,7 @@ const store = useLeadStore();
 const permissions = usePermissions();
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
-const form = reactive<StatusForm>({ status: null, note: '', outcomeNote: '', lostReason: '' });
+const form = reactive<StatusForm>({ status: undefined, note: '', outcomeNote: '', lostReason: '' });
 
 const options = computed(() => {
   if (!props.lead) return [];
@@ -85,7 +85,7 @@ async function submit(): Promise<void> {
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) Object.assign(form, { status: null, note: '', outcomeNote: '', lostReason: '' });
+    if (open) Object.assign(form, { status: undefined, note: '', outcomeNote: '', lostReason: '' });
   },
 );
 </script>

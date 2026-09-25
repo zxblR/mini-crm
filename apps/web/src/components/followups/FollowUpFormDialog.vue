@@ -13,7 +13,7 @@ interface FollowUpFormModel {
   occurredAt: Date;
   summary: string;
   result: string;
-  nextStepAt: Date | null;
+  nextStepAt: Date | undefined;
 }
 
 const props = defineProps<{
@@ -32,7 +32,7 @@ const form = reactive<FollowUpFormModel>(emptyForm());
 const title = computed(() => (props.followUp ? '编辑跟进记录' : '新增跟进记录'));
 
 function emptyForm(): FollowUpFormModel {
-  return { type: FollowUpType.Call, occurredAt: new Date(), summary: '', result: '', nextStepAt: null };
+  return { type: FollowUpType.Call, occurredAt: new Date(), summary: '', result: '', nextStepAt: undefined };
 }
 
 function resetForm(): void {
@@ -45,7 +45,7 @@ function resetForm(): void {
           occurredAt: new Date(item.occurredAt),
           summary: item.summary,
           result: item.result ?? '',
-          nextStepAt: item.nextStepAt ? new Date(item.nextStepAt) : null,
+          nextStepAt: item.nextStepAt ? new Date(item.nextStepAt) : undefined,
         }
       : emptyForm(),
   );

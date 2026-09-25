@@ -104,3 +104,7 @@ export interface LossReasonStatsDTO {
   lostReason: string;
   count: number;
 }
+
+export interface StatsFilter extends DashboardFilter {
+  granularity?: Granularity;
+}

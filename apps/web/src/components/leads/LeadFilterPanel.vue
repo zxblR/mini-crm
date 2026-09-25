@@ -18,17 +18,17 @@ const emit = defineEmits<{
 }>();
 
 const form = reactive<LeadQuery>({ ...props.modelValue });
-const dateRange = ref<[Date, Date] | null>(
+const dateRange = ref<[Date, Date] | undefined>(
   props.modelValue.from && props.modelValue.to
     ? [new Date(props.modelValue.from), new Date(props.modelValue.to)]
-    : null,
+    : undefined,
 );
 
 watch(
   () => props.modelValue,
   (value) => {
     Object.assign(form, value);
-    dateRange.value = value.from && value.to ? [new Date(value.from), new Date(value.to)] : null;
+    dateRange.value = value.from && value.to ? [new Date(value.from), new Date(value.to)] : undefined;
   },
   { deep: true },
 );
@@ -42,7 +42,7 @@ function submit(): void {
 }
 
 function reset(): void {
-  dateRange.value = null;
+  dateRange.value = undefined;
   Object.assign(form, {
     page: 1,
     pageSize: 20,
