@@ -25,6 +25,48 @@ export interface GenerateAiSuggestionInput {
   forceRefresh: boolean;
 }
 
+export interface IntentScoreResult {
+  score: number;
+  level: 'low' | 'medium' | 'high';
+  confidence: number;
+  reasons: string[];
+}
+
+export interface FollowUpSummaryResult {
+  summary: string;
+  keyPoints: string[];
+  risks: string[];
+  openQuestions: string[];
+}
+
+export interface NextActionResult {
+  action: string;
+  rationale: string;
+  priority: 'low' | 'medium' | 'high';
+  dueInHours: number;
+}
+
+export interface ScriptResult {
+  channel: 'phone' | 'email' | 'message';
+  subject: string;
+  script: string;
+  personalizationNotes: string[];
+}
+
+export interface WakeUpResult {
+  shouldWakeUp: boolean;
+  reason: string;
+  suggestedChannel: 'phone' | 'email' | 'message' | 'none';
+  suggestedAtHours: number;
+}
+
+export type AiSuggestionResult =
+  | IntentScoreResult
+  | FollowUpSummaryResult
+  | NextActionResult
+  | ScriptResult
+  | WakeUpResult;
+
 export interface AiSuggestion<T = unknown> {
   id: string
   leadId: string

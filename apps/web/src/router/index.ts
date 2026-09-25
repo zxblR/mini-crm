@@ -43,19 +43,19 @@ const router = createRouter({
         {
           path: 'tasks',
           name: 'tasks',
-          component: () => import('@/components/common/RoutePlaceholder.vue'),
+          component: () => import('@/views/TaskView.vue'),
           meta: { requiresAuth: true, title: '任务', menuKey: 'tasks' },
         },
         {
           path: 'stats',
           name: 'stats',
-          component: () => import('@/components/common/RoutePlaceholder.vue'),
+          component: () => import('@/views/StatsView.vue'),
           meta: { requiresAuth: true, title: '统计', menuKey: 'stats' },
         },
         {
           path: 'settings',
           name: 'settings',
-          component: () => import('@/components/common/RoutePlaceholder.vue'),
+          component: () => import('@/views/SettingsView.vue'),
           meta: {
             requiresAuth: true,
             title: '设置',
@@ -66,7 +66,7 @@ const router = createRouter({
         {
           path: '403',
           name: 'forbidden',
-          component: () => import('@/components/common/RoutePlaceholder.vue'),
+          component: () => import('@/views/ForbiddenView.vue'),
           meta: { requiresAuth: true, title: '无权限' },
         },
       ],
