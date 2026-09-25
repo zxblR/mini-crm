@@ -16,6 +16,11 @@ body {
   margin: 0;
 }
 
+button,
+input {
+  font: inherit;
+}
+
 .page-shell {
   display: grid;
   min-height: 100vh;
@@ -54,37 +59,150 @@ h1 {
   width: 100%;
 }
 
-.workspace-shell {
+.app-layout {
+  display: flex;
   min-height: 100vh;
   background: #f8fafc;
 }
 
-.topbar {
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex: 0 0 232px;
+  flex-direction: column;
+  width: 232px;
+  height: 100vh;
+  background: #0f172a;
+  transition: width 0.2s ease, transform 0.2s ease;
+}
+
+.app-sidebar.is-collapsed {
+  flex-basis: 64px;
+  width: 64px;
+}
+
+.sidebar-brand {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  min-height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgb(148 163 184 / 20%);
+}
+
+.sidebar-brand .brand-mark {
+  color: #fff;
+  white-space: nowrap;
+}
+
+.sidebar-close {
+  display: none;
+  color: #cbd5e1;
+}
+
+.sidebar-menu {
+  flex: 1;
+  border-right: 0;
+  background: transparent;
+  --el-menu-text-color: #cbd5e1;
+  --el-menu-hover-text-color: #fff;
+  --el-menu-hover-bg-color: #1e293b;
+  --el-menu-active-color: #fff;
+  --el-menu-bg-color: transparent;
+}
+
+.sidebar-menu .el-menu-item.is-active {
+  background: #1d4ed8;
+}
+
+.app-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
   padding: 0 32px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.workspace-content {
-  width: min(1180px, calc(100% - 48px));
-  margin: 0 auto;
-  padding: 32px 0;
+.topbar-leading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.breadcrumb {
+.topbar-leading strong {
+  font-size: 16px;
+}
+
+.desktop-menu-button,
+.mobile-menu-button {
+  color: #64748b;
+}
+
+.mobile-menu-button {
+  display: none;
+}
+
+.user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px;
+  color: #1f2937;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.user-menu-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.user-menu-copy strong {
+  font-size: 13px;
+}
+
+.user-menu-copy small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.app-content {
+  width: min(1180px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.app-breadcrumb {
   margin-bottom: 28px;
 }
 
-.workspace-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 48px;
+.app-breadcrumb a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.placeholder-view {
+  min-height: 480px;
+  padding: 32px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.placeholder-view .el-empty {
+  padding: 80px 0 32px;
 }
 
 .eyebrow {
@@ -95,21 +213,67 @@ h1 {
   letter-spacing: 0.12em;
 }
 
-@media (max-width: 640px) {
-  .topbar {
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed;
+    transform: translateX(-100%);
+  }
+
+  .app-sidebar.is-mobile-open {
+    transform: translateX(0);
+  }
+
+  .app-sidebar.is-collapsed {
+    width: 232px;
+  }
+
+  .app-sidebar.is-collapsed .sidebar-brand .brand-mark {
+    display: inline;
+  }
+
+  .sidebar-close,
+  .mobile-menu-button {
+    display: inline-flex;
+  }
+
+  .desktop-menu-button {
+    display: none;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: block;
+    background: rgb(15 23 42 / 45%);
+    border: 0;
+  }
+
+  .app-topbar {
     padding: 0 20px;
   }
 
-  .workspace-content {
+  .app-content {
     width: min(100% - 32px, 1180px);
     padding-top: 24px;
   }
 
-  .workspace-heading {
-    display: block;
+  .placeholder-view {
+    min-height: 420px;
+    padding: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-menu-copy {
+    display: none;
   }
 
-  .workspace-heading .el-button {
-    margin-top: 16px;
+  .app-content {
+    width: min(100% - 24px, 1180px);
   }
 }
