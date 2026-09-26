@@ -197,3 +197,12 @@
 - 依据 ADR 0003 固化 Roadmap、权限、超时、缓存、LLM 供应商和 FastAPI 兼容决策。
 - 新增 `ai_suggestions` schema/migration、Java AI 调用链、FastAPI 内部端点、共享 TS 契约和 prompt 文件。
 - 未执行 shell 命令、构建、测试、数据库操作或 Git 写操作；待人工验收。
+
+## 2026-09-25：阶段 9 Compose 一键启动
+
+- 分支：`feature`；仅执行只读检查和文件编辑，未创建、切换、提交或推送其他分支。
+- A～E 检查：确认现有 Compose 只有 API、AI、PostgreSQL、Redis；仅有 API/AI Dockerfile；Web Vite proxy 指向本地 API 且 Axios 默认 `/api/v1`；FastAPI 入口为 `main:app`；根 Prisma migration 位于 `prisma/migrations`。
+- 变更：新增 `migrate` 一次性容器、Web 多阶段 Dockerfile、nginx 反代、内网 `mock-llm`、Compose 健康依赖和 Web/数据库/Redis 端口映射；`.env.example`、README 和部署拓扑同步更新。
+- LLM：Compose 默认 `LLM_BASE_URL=http://mock-llm:9000`，配置真实 OpenAI-compatible DeepSeek 地址和 key 即可切换；浏览器仍不直接访问 AI。
+- Seed：`SEED_ON_START` 默认 `false`，仅迁移容器执行开发 seed；生产部署不建议开启。
+- 验收：本轮未运行 Docker、Maven、pnpm、Python 或数据库命令；等待人工执行阶段 9 验收命令。

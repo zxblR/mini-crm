@@ -1,6 +1,93 @@
 name: mini-crm
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mini_crm}
+    ports:
+      - '${POSTGRES_PORT:-55432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mock-llm:
+    build:
+      context: .
+      dockerfile: infra/docker/mock-llm.Dockerfile
+    restart: unless-stopped
+    expose:
+      - '9000'
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:9000/health")']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/migrate.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-crm_local_password}@postgres:5432/${POSTGRES_DB:-mini_crm}?schema=public
+      SEED_ON_START: ${SEED_ON_START:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        pnpm exec prisma migrate deploy --schema prisma/schema.prisma
+        && if [ "$$SEED_ON_START" = "true" ]; then
+        pnpm exec prisma db execute --schema prisma/schema.prisma --file prisma/seed.sql;
+        fi
+
+  ai:
+    build:
+      context: .
+      dockerfile: infra/docker/ai.Dockerfile
+    restart: unless-stopped
+    environment:
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-replace-with-a-long-random-internal-token}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://mock-llm:9000}
+      LLM_API_KEY: ${LLM_API_KEY:-mock-key}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-8}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-768}
+    expose:
+      - '8000'
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health")']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      mock-llm:
+        condition: service_healthy
+
   api:
     build:
       context: .
@@ -16,60 +103,26 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-a-long-development-secret}
       JWT_ACCESS_EXPIRATION_SECONDS: ${JWT_ACCESS_EXPIRATION_SECONDS:-900}
       IMPORT_STORAGE_DIR: /app/data/imports
-    ports:
-      - '${API_PORT:-8080}:8080'
     volumes:
       - api_imports:/app/data/imports
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       ai:
-        condition: service_started
+        condition: service_healthy
 
-  ai:
+  web:
     build:
       context: .
-      dockerfile: infra/docker/ai.Dockerfile
-    restart: unless-stopped
-    environment:
-      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-replace-with-a-long-random-internal-token}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-8}
-      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-768}
-    ports:
-      - '${AI_PORT:-8000}:8000'
-
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-crm}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_password}
-      POSTGRES_DB: ${POSTGRES_DB:-mini_crm}
-    ports:
-      - '${POSTGRES_PORT:-55432}:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7.4-alpine
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
     restart: unless-stopped
     ports:
-      - '${REDIS_PORT:-6379}:6379'
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      api:
+        condition: service_started
 
 volumes:
   api_imports:
