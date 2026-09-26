@@ -5,10 +5,12 @@
 ```mermaid
 flowchart LR
     Browser["浏览器"]
-    Web["apps/web<br/>Vue 3 + TypeScript"]
+    Web["web<br/>nginx + Vue 3"]
     Shared["packages/shared<br/>前端共享类型"]
     Api["apps/api<br/>Java Spring Boot<br/>host:8080"]
     AI["apps/ai<br/>FastAPI"]
+    Mock["mock-llm<br/>OpenAI-compatible<br/>internal:9000"]
+    Migrate["migrate<br/>one-shot Prisma deploy"]
     Prisma["prisma/<br/>schema + migrations"]
     Postgres[("PostgreSQL<br/>host: 55432")]
     Redis[("Redis<br/>host: 6379")]
@@ -19,8 +21,11 @@ flowchart LR
     Web -->|/api/v1<br/>Bearer access token| Api
     Api -->|JDBC + 参数化 SQL| Postgres
     Api -->|内部 HTTP<br/>AI_SERVICE_URL| AI
+    AI -->|LLM_BASE_URL| Mock
     Api -.->|就绪检查/异步能力| Redis
     Prisma -->|migration deploy| Postgres
+    Migrate -->|wait healthy + deploy| Postgres
+    Migrate -.->|success gate| Api
     Compose -.->|构建与编排| Api
     Compose -.->|构建与编排| AI
     Compose -.->|启动| Postgres
@@ -47,9 +52,11 @@ AI 结果只使用 PostgreSQL ai_suggestions 持久化和缓存，不引入 Redi
 
 ## 部署边界
 
-- `docker-compose.yml` 使用 `infra/docker/api.Dockerfile` 和 `infra/docker/ai.Dockerfile` 构建 API、AI 服务。
-- PostgreSQL 宿主机端口统一为 `55432`，Java 容器通过 Compose 服务名 `postgres` 访问。
-- API 容器通过服务名 `ai` 访问 FastAPI；宿主机访问 AI 端口仅用于本地开发和调试。
+- `docker-compose.yml` 编排 `postgres`、`redis`、一次性 `migrate`、`api`、`ai`、`web` 和仅开发使用的 `mock-llm`。
+- `migrate` 等待 PostgreSQL healthy 后执行根目录 `prisma migrate deploy`；只有迁移成功，API 才会启动。 `SEED_ON_START=true` 才执行幂等开发 seed，生产部署保持 `false`。
+- Web 使用 `apps/web/Dockerfile` 的 Node 构建阶段和 nginx 运行阶段，宿主机通过 `8080 -> 80` 访问；nginx 将 `/api/v1` 反代到 `api:8080`，前端 Axios 保持同域 `/api/v1`。
+- API、AI 和 mock-llm 仅加入 Compose 内网，不映射宿主机端口。PostgreSQL 仍映射 `55432 -> 5432`，Redis 映射 `6379 -> 6379`。
+- `LLM_BASE_URL` 默认为 `http://mock-llm:9000`。将 `.env` 中的地址改为真实 DeepSeek OpenAI-compatible 地址并配置 `LLM_API_KEY` 即可切换。
 - `archive/api-nest` 是历史迁移参考，不加入 pnpm workspace，不被 Compose 构建。
 ## 阶段 6 AI 调用边界
 
