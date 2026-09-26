@@ -66,7 +66,6 @@ enum AiSuggestionType {
 }
 
 model Organization {
-  aiSuggestions AiSuggestion[]
   id            String          @id @default(uuid()) @db.Uuid
   name          String          @db.VarChar(120)
   slug          String          @unique @db.VarChar(80)
@@ -176,7 +175,6 @@ model PipelineStage {
 }
 
 model Lead {
-  aiSuggestions AiSuggestion[]
   id              String         @id @default(uuid()) @db.Uuid
   organizationId  String         @map("organization_id") @db.Uuid
   name            String?        @db.VarChar(100)
@@ -385,35 +383,5 @@ model AiSuggestion {
 
   @@unique([organizationId, leadId, type, promptVersion, inputHash], map: "ai_suggestions_cache_key")
   @@index([organizationId, leadId, type, updatedAt])
-  @@map("ai_suggestions")
-}
-enum AiSuggestionType {
-  INTENT_SCORE
-  FOLLOW_UP_SUMMARY
-  NEXT_ACTION
-  SCRIPT
-  WAKE_UP
-}
-
-model AiSuggestion {
-  id             String           @id @db.Uuid
-  organizationId String           @map("organization_id") @db.Uuid
-  leadId         String           @map("lead_id") @db.Uuid
-  createdBy      String           @map("created_by") @db.Uuid
-  type           AiSuggestionType @map("suggestion_type")
-  inputHash      String           @map("input_hash") @db.VarChar(64)
-  promptVersion  String           @map("prompt_version") @db.VarChar(32)
-  result         Json
-  model          String           @db.VarChar(128)
-  expiresAt      DateTime         @map("expires_at") @db.Timestamptz(6)
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  organization Organization @relation(fields: [organizationId], references: [id])
-  lead         Lead         @relation(fields: [leadId], references: [id])
-
-  @@unique([organizationId, leadId, type, inputHash, promptVersion], name: "ai_suggestions_cache_key")
-  @@index([organizationId, leadId])
-  @@index([expiresAt])
   @@map("ai_suggestions")
 }

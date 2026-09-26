@@ -10,11 +10,11 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 
 - 前端：Vue 3 + TypeScript + Vite + Pinia + Element Plus + ECharts + Axios。
 - 业务 API：Java 21 + Spring Boot 3 + Maven + Spring MVC + Bean Validation + Springdoc OpenAPI。
-- AI 服务：Python 3.12 + FastAPI，仅提供内部 AI HTTP 能力。
+- AI 服务：Python 3.12 + FastAPI + Pydantic，仅提供内部 AI HTTP 能力。
 - 数据库：PostgreSQL 16，宿主机默认端口 `55432`，容器内端口 `5432`。
 - 数据访问：Java 使用 Spring JDBC/JdbcTemplate；禁止引入 ORM。
 - 数据模型工具：Prisma 只维护根目录 `prisma/` 下的 schema 和 migration，不作为 Java API 运行时依赖。
-- 基础设施：Docker Compose、PostgreSQL、Redis；BullMQ/ioredis 只在实际启用异步能力时使用。
+- 基础设施：Docker Compose、PostgreSQL、Redis、nginx；BullMQ/ioredis 只在实际启用异步能力时使用。
 
 ## 2. 目录职责
 
@@ -30,23 +30,27 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 │  ├─ schema.prisma         # PostgreSQL 数据模型声明
 │  └─ migrations/           # 可重复部署、不可篡改的数据库迁移
 ├─ infra/
-│  └─ docker/               # API/AI Dockerfile 等构建资产
-├─ docs/                    # PRD、ER、API、架构、路线图和实施日志
+│  ├─ docker/               # API/AI/migrate/mock-llm Dockerfile 等构建资产
+│  └─ nginx/                # Web 反向代理配置
+├─ docs/                    # PRD、ER、API、架构、路线图、汇报和演示脚本
 ├─ scripts/                 # 预检、维护和一次性工程脚本
 ├─ archive/                 # 非运行时的历史迁移参考，不加入 workspace
-├─ docker-compose.yml       # 本地服务编排
+├─ docker-compose.yml       # Web/API/AI/数据库/Redis 本地服务编排
 └─ package.json             # 根级 pnpm 和 Prisma CLI 脚本
 ```
 
 边界规则：
 
-- `apps/web` 不连接 PostgreSQL、Redis 或 FastAPI，只通过 `VITE_API_BASE_URL` 调用 `apps/api`。
+- `apps/web` 不连接 PostgreSQL、Redis 或 FastAPI，只通过 nginx 同域 `/api/v1` 调用 `apps/api`；开发模式由 Vite proxy 转发。
 - `apps/api` 是浏览器可访问的唯一业务 API。Controller 只负责协议适配、DTO 校验和权限声明；Service 负责业务规则；Repository/DAO 负责参数化 SQL 和数据库访问。
 - `apps/api` 不使用 Prisma Client，不读取 `prisma/` 生成的运行时代码，也不在业务代码中拼接 SQL。
-- `apps/ai` 不持有业务数据库连接，不绕过 Java API 的认证、组织隔离和敏感信息脱敏。
+- `apps/ai` 不持有业务数据库连接，不保存业务状态，不绕过 Java API 的认证、组织隔离和敏感信息脱敏；内部端点使用 `AI_SERVICE_TOKEN`。
 - `packages/shared` 只服务前端 TypeScript；Java DTO、Python Pydantic 模型和共享 TS 类型必须以 `docs/api.md` 为契约来源，不能复制粘贴成互不兼容的协议。
 - `archive/` 仅保存旧技术栈的迁移参考，不参与 Compose、Maven、pnpm workspace 或生产镜像。
-- 已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md` 不因目录整理修改；只有字段或架构发生明确冲突时，先记录 ADR 再修改。
+- Compose 的 `migrate` 一次性容器等待 PostgreSQL healthy 后执行根目录 Prisma migration；`SEED_ON_START=true` 才执行本地演示 seed。
+- Compose 的 `web` 使用 Vue 构建产物和 nginx，宿主机默认通过 `8080` 访问；API、AI 和 mock-llm 仅加入 Compose 内网。
+- AI 默认使用内部 `mock-llm`，生产切换到 OpenAI-compatible 服务时只通过环境变量提供 `LLM_BASE_URL`、`LLM_API_KEY` 和 `LLM_MODEL`。
+- 已审核的 `docs/prd.md`、`docs/er-diagram.md`、`docs/api.md`、`docs/roadmap.md` 不因目录整理随意修改；阶段 10 文档收尾可在不改变业务结构的前提下更新 API、ER 和架构说明，若字段或架构发生明确冲突，先记录 ADR。
 
 ## 3. 分层与编码规范
 
@@ -72,6 +76,7 @@ Mini CRM 面向小微团队管理客户线索、销售阶段、跟进记录和�
 - FastAPI 路由只做协议适配，Pydantic 模型负责输入输出校验。
 - AI 服务只处理 AI 输入和输出，不访问业务数据库，不保存业务状态。
 - 内部接口必须有超时、可观测性和最小必要字段；不得把浏览器请求直接转发为未鉴权的 AI 请求。
+- 当前 AI 能力包括意向评分、跟进摘要、下一步建议、话术生成和沉默唤醒；Java API 负责缓存、权限、超时、重试和错误映射。
 
 ## 4. Prisma 与 Java 数据模型对齐
 
@@ -161,3 +166,10 @@ docker compose config
 ## 9. Definition of Done
 
 目录边界、运行命令、Compose 路径、环境变量和文档保持一致；不引入新业务逻辑、不修改数据库结构；Java、Python、前端和 Prisma 的契约可追溯；日志和审计上下文可关联；强制验收命令通过。
+
+## 10. 阶段 10 文档收尾
+
+- 阶段 10 只允许修改 README、AGENTS 和 `docs/` 文档，不修改 Java、FastAPI、Vue、Prisma schema、migration 或运行时依赖。
+- `docs/report.md` 的代码量必须由人工使用 cloc 统计；未提供结果前使用 `?` 占位，不凭估算填数。
+- `docs/report.md` 必须区分源码测试数量、真实 PostgreSQL 验证、FastAPI/mock-LLM 验证和 E2E 验收；测试数不等于覆盖率。
+- 演示账号只允许引用 `prisma/seed.sql` 中的本地演示账号；生产部署必须关闭 seed、替换默认密钥并删除示例凭据。
